@@ -1,5 +1,46 @@
 import streamlit as st
 import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
+
+# 1. Konfigurasi Halaman (Wide Layout & Clean Padding)
+st.set_page_config(
+    page_title="Smart Tourism Dashboard Desa Badransari", 
+    page_icon="🌿", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
+
+# =====================================================================
+# 2. FUNGSI PENARIK DATA DARI GOOGLE SHEETS
+# =====================================================================
+# Menggunakan cache agar load dashboard cepat dan update setiap 5 menit (300 detik)
+@st.cache_data(ttl=300)
+def load_data():
+    # Link CSV langsung dari Google Sheets Badransari
+    sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQKKKcpZx8EmXlfYNuvmRiSELTuvbk-8JnypvB3XOCttZpfBrBpa2kkgGiy3kezyhyOlK9yXJMbrjSD/pub?output=csv"
+    
+    # Membaca data
+    df = pd.read_csv(sheet_url)
+    return df
+
+# Eksekusi penarikan data
+try:
+    df = load_data()
+except Exception as e:
+    st.error("Gagal menarik data dari Google Sheets. Pastikan link dan format data sudah benar.")
+    st.stop()
+
+# =====================================================================
+# 3. VISUALISASI & TATA LETAK DASHBOARD
+# =====================================================================
+
+# PASTIKAN NAMA KOLOM DI SPREADSHEET SAMA PERSIS DENGAN YANG ADA DI KODE VISUALISASI
+# (Misal: df['Bulan'], df['Pendapatan'], dll)
+
+# ---> PASTE SISA KODE VISUALISASI FINAL LU DI BAWAH SINI <---
+import streamlit as st
+import pandas as pd
 import random
 import warnings
 import streamlit.components.v1 as components
@@ -752,3 +793,4 @@ dashboard_html = f"""
 """
 
 components.html(dashboard_html, height=1550, scrolling=True)
+
