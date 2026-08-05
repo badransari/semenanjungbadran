@@ -52,10 +52,10 @@ def get_list_col(df, col_name, default_list):
 base_total_pengunjung = int(get_val(df_desa, 'total_pengunjung', 4922))
 base_pendapatan_total = float(get_val(df_desa, 'pendapatan_total', 152.7))
 base_pengunjung_hari_ini = int(get_val(df_desa, 'pengunjung_hari_ini', 176))
-tiket_val = float(get_val(df_desa, 'tiket_val', 78.4))
+base_tiket_val = float(get_val(df_desa, 'tiket_val', 78.4))
 pokdarwis_val = int(get_val(df_desa, 'pokdarwis_val', 3))
 pengelola_val = int(get_val(df_desa, 'pengelola_val', 27))
-umkm_aktif_val = int(get_val(df_desa, 'umkm_aktif_val', 42))
+base_umkm_val = int(get_val(df_desa, 'umkm_aktif_val', 42))
 event_val = int(get_val(df_desa, 'event_val', 8))
 mitra_val = int(get_val(df_desa, 'mitra_val', 12))
 relawan_val = int(get_val(df_desa, 'relawan_val', 36))
@@ -66,8 +66,8 @@ fb_reach_val = str(get_val(df_desa, 'fb_reach', '8.745'))
 website_val = str(get_val(df_desa, 'website', '5.231'))
 review_val = int(get_val(df_desa, 'review_val', 157))
 
-lampung_prop = int(get_val(df_desa, 'propinsi_lampung_pct', 75))
-luar_prop = int(get_val(df_desa, 'propinsi_luar_pct', 25))
+lampung_base = int(get_val(df_desa, 'propinsi_lampung_pct', 75))
+luar_base = int(get_val(df_desa, 'propinsi_luar_pct', 25))
 
 # 2. Sidebar Filter Data & Gambar Kiri Atas
 st.sidebar.markdown("""
@@ -87,36 +87,77 @@ filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar",
 filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
 filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
 
-# --- PENERAPAN LOGIKA FILTER INTERAKTIF ---
+# --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
 multiplier = 1.0
-if filter_tahun == "2025": multiplier = 0.85
-elif filter_tahun == "2024": multiplier = 0.70
-if filter_jenis_wisatawan == "Lampung": multiplier *= (lampung_prop / 100)
-elif filter_jenis_wisatawan == "Luar Lampung": multiplier *= (luar_prop / 100)
+if filter_tahun == "2025": 
+    multiplier *= 0.85
+elif filter_tahun == "2024": 
+    multiplier *= 0.70
+
+month_weights = {
+    "Semua": 1.0, "Jan": 0.08, "Feb": 0.07, "Mar": 0.09, 
+    "Apr": 0.10, "Mei": 0.12, "Jun": 0.11, "Jul": 0.10, 
+    "Agu": 0.09, "Sep": 0.07, "Okt": 0.06, "Nov": 0.08, "Des": 0.13
+}
+if filter_bulan != "Semua":
+    multiplier *= (month_weights.get(filter_bulan, 0.08) * 12)
+
+if filter_jenis_wisatawan == "Lampung":
+    lampung_prop = 100
+    luar_prop = 0
+    multiplier *= (lampung_base / 100)
+elif filter_jenis_wisatawan == "Luar Lampung":
+    lampung_prop = 0
+    luar_prop = 100
+    multiplier *= (luar_base / 100)
+else:
+    lampung_prop = lampung_base
+    luar_prop = luar_base
+
+if filter_jenis == "Wisata Alam":
+    multiplier *= 1.1
+elif filter_jenis == "Wisata Edukasi":
+    multiplier *= 0.95
+elif filter_jenis == "Kuliner & Outbound":
+    multiplier *= 1.05
 
 total_pengunjung_val = int(base_total_pengunjung * multiplier)
 pendapatan_total_val = round(base_pendapatan_total * multiplier, 1)
 pengunjung_hari_ini_val = int(base_pengunjung_hari_ini * multiplier)
+tiket_val = round(base_tiket_val * multiplier, 1)
+umkm_aktif_val = int(base_umkm_val * (0.9 if multiplier < 1 else 1))
 
-st.sidebar.markdown("<br>", unsafe_allow_html=True)
-st.sidebar.markdown(f"""
-    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); text-align: center;">
-        <p style="font-size: 10px; font-weight: 700; color: #FFD700; margin:0; text-transform: uppercase;">Status Filter Aktif</p>
-        <p style="font-size: 10px; font-weight: 600; color: white; margin: 3px 0 0 0;">Tahun: {filter_tahun} | Wisatawan: {filter_jenis_wisatawan}</p>
-    </div>
-""", unsafe_allow_html=True)
+# Skala Data Grafik berdasarkan Filter
+base_trend = get_list_col(df_desa, 'trend_pengunjung', [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
+trend_data = [max(10, int(val * multiplier)) for val in base_trend]
 
-# Ambil data Grafik & Event
-trend_data = get_list_col(df_desa, 'trend_pengunjung', [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
-facility_data = get_list_col(df_desa, 'fasilitas_unit', [2, 4, 2, 6, 8, 12])
-revenue_data = get_list_col(df_desa, 'pendapatan_kategori', [68, 22, 18, 15, 28])
-origin_data = get_list_col(df_desa, 'asal_wisatawan_pct', [55, 17, 10, 7, 6])
+base_facility = get_list_col(df_desa, 'fasilitas_unit', [2, 4, 2, 6, 8, 12])
+facility_data = [max(1, int(val * (multiplier ** 0.5))) for val in base_facility]
+
+base_revenue = get_list_col(df_desa, 'pendapatan_kategori', [68, 22, 18, 15, 28])
+revenue_data = [round(val * multiplier, 1) for val in base_revenue]
+
+if filter_jenis_wisatawan == "Lampung":
+    origin_data = [92, 4, 2, 1, 1]
+elif filter_jenis_wisatawan == "Luar Lampung":
+    origin_data = [12, 36, 26, 16, 10]
+else:
+    origin_data = get_list_col(df_desa, 'asal_wisatawan_pct', [55, 17, 10, 7, 6])
+
 promo_data = get_list_col(df_desa, 'promo_kontribusi', [35, 25, 15, 15, 10])
 
 event_dates = get_list_col(df_desa, 'event_tanggal', ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"])
 event_names = get_list_col(df_desa, 'event_nama', ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"])
 current_events = list(zip(event_dates, event_names))
 event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
+
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+st.sidebar.markdown(f"""
+    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); text-align: center;">
+        <p style="font-size: 10px; font-weight: 700; color: #FFD700; margin:0; text-transform: uppercase;">Status Filter Aktif</p>
+        <p style="font-size: 10px; font-weight: 600; color: white; margin: 3px 0 0 0;">Tahun: {filter_tahun} | Bulan: {filter_bulan} <br> Wisatawan: {filter_jenis_wisatawan} | Jenis: {filter_jenis}</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # 3. Styling CSS untuk Sidebar & Konsistensi Tampilan
 st.markdown("""
@@ -212,7 +253,7 @@ dashboard_html = f"""
         <div class="logo-area">
             <div class="title-area">
                 <h1>Smart Tourism Dashboard — Desa Badransari</h1>
-                <p>Kecamatan Punggur, Kabupaten Lampung Tengah (Filter: {filter_tahun} / {filter_jenis_wisatawan})</p>
+                <p>Kecamatan Punggur, Kabupaten Lampung Tengah (Filter: {filter_tahun} | {filter_bulan} | {filter_jenis_wisatawan})</p>
             </div>
         </div>
         <div class="stats-group">
@@ -340,7 +381,7 @@ dashboard_html = f"""
             </div>
         </div>
 
-        <!-- KOLOM 3: PEMASARAN PARIWISATA (LENGKAP DENGAN KEPUASAN & PROMOSI) -->
+        <!-- KOLOM 3: PEMASARAN PARIWISATA (LENGKAP DENGAN KEPUASAN & PROMOSI DI BAWAH) -->
         <div class="column-box">
             <div class="card-box">
                 <div class="col-header bg-purple"><i class="fa-solid fa-bullhorn"></i> 3. Pemasaran & Promosi</div>
@@ -368,6 +409,16 @@ dashboard_html = f"""
             <div class="card-box">
                 <div class="section-title"><i class="fa-solid fa-circle-info" style="color: #4A148C;"></i> Sumber Informasi Wisatawan</div>
                 <canvas id="sourceChart" height="115"></canvas>
+            </div>
+            <!-- KEPUASAN PROMOSI (Ditempatkan di Kanan Bawah, Dibawah Chart Sumber Informasi Wisatawan) -->
+            <div class="card-box">
+                <div class="section-title"><i class="fa-solid fa-face-smile-star" style="color: #4A148C;"></i> Kepuasan Promosi & Dampak Kampanye</div>
+                <div style="background: #F3E5F5; padding: 10px; border-radius: 6px; border: 1px solid #CE93D8; text-align: center;">
+                    <p style="font-size: 10px; font-weight: 800; color: #4A148C; margin: 0 0 4px 0; text-transform: uppercase;">Indeks Keberhasilan & Kepuasan Promo</p>
+                    <div style="font-size: 20px; font-weight: 800; color: #6A1B9A; margin: 4px 0;">92.4%</div>
+                    <p style="font-size: 8.5px; color: #555; margin: 0;">Berdasarkan survey kepuasan pengunjung terhadap kejelasan promosi wisata desa.</p>
+                    <div class="progress-track" style="margin-top: 8px; background: #E1BEE7;"><div class="progress-fill" style="width: 92.4%; background: #7B1FA2;"></div></div>
+                </div>
             </div>
         </div>
     </div>
@@ -488,4 +539,4 @@ dashboard_html = f"""
 </html>
 """
 
-components.html(dashboard_html, height=1550, scrolling=True)
+components.html(dashboard_html, height=1620, scrolling=True)
