@@ -26,11 +26,14 @@ def load_desa_data(url):
         df = pd.read_csv(url)
         return df
     except Exception as e:
-        st.error(f"Gagal memuat data dari Spreadsheet: {e}")
         return None
 
 df_desa = load_desa_data(SHEET_URL)
 df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
+
+# Jika df_manajemen gagal dimuat, fallback pakai df_desa agar tidak error
+if df_manajemen is None or df_manajemen.empty:
+    df_manajemen = df_desa
 
 # --- FUNGSI AMBIL DATA YANG AKURAT & AMAN DARI SPREADSHEET ---
 def get_col_val(df, col_keywords, default_val):
