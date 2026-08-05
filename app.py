@@ -17,7 +17,6 @@ st.set_page_config(
 # --- KONEKSI SUMBER DATA (GOOGLE SHEETS CSV ANDA) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv"
 
-# Menggunakan TTL 0 agar selalu mengecek pembaruan, ditambah tombol refresh manual
 @st.cache_data(ttl=0) 
 def load_desa_data(url):
     if not url:
@@ -31,15 +30,7 @@ def load_desa_data(url):
 
 df_desa = load_desa_data(SHEET_URL)
 
-# --- TOMBOL REFRESH MANUAL UNTUK DESA ---
-st.sidebar.markdown("---")
-if st.sidebar.button("🔄 Refresh Data Spreadsheet", use_container_width=True):
-    st.cache_data.clear()
-    st.success("Cache berhasil dibersihkan! Data diperbarui.")
-    st.rerun()
-st.sidebar.markdown("---")
-
-# --- FUNGSI AMBIL DATA & KONVERSI AMAN (ANTI-ERROR) ---
+# --- FUNGSI AMBIL DATA & KONVERSI AMAN (ANTI-ERROR & ROBUST) ---
 def get_val_flex(df, key_candidates, default_val):
     if df is None or df.empty:
         return default_val
@@ -49,23 +40,24 @@ def get_val_flex(df, key_candidates, default_val):
     
     # 1. Cek berdasarkan nama kolom (Header)
     for col in df.columns:
-        if str(col).strip().lower() in norm_candidates:
+        col_clean = str(col).strip().lower()
+        if any(cand in col_clean for cand in norm_candidates):
             try:
-                val = df[col].dropna().iloc[0]
-                if not pd.isna(val):
-                    return val
+                vals = df[col].dropna()
+                for v in vals:
+                    # Lewati baris teks label seperti 'jumlah' jika terbaca
+                    if str(v).strip().lower() not in ['jumlah', 'indikator', 'value', 'data']:
+                        return v
             except:
                 pass
                 
     # 2. Cek berdasarkan baris (Format Key-Value: Kolom 0 = Kunci, Kolom 1 = Nilai)
     if len(df.columns) >= 2:
-        key_col = df.columns[0]
-        val_col = df.columns[1]
         for idx, row in df.iterrows():
-            row_key = str(row[key_col]).strip().lower()
-            if row_key in norm_candidates:
+            row_key = str(row[df.columns[0]]).strip().lower()
+            if any(cand in row_key for cand in norm_candidates):
                 try:
-                    val = row[val_col]
+                    val = row[df.columns[1]]
                     if not pd.isna(val):
                         return val
                 except:
@@ -80,13 +72,15 @@ def get_list_flex(df, key_candidates, default_list):
     norm_candidates = [str(k).strip().lower() for k in key_candidates]
     
     for col in df.columns:
-        if str(col).strip().lower() in norm_candidates:
+        col_clean = str(col).strip().lower()
+        if any(cand in col_clean for cand in norm_candidates):
             try:
                 vals = df[col].dropna().tolist()
-                if len(vals) > 0:
-                    if len(vals) == 1 and isinstance(vals[0], str) and ',' in vals[0]:
-                        return [v.strip() for v in vals[0].split(',')]
-                    return vals
+                clean_vals = [v for v in vals if str(v).strip().lower() not in ['jumlah', 'indikator']]
+                if len(clean_vals) > 0:
+                    if len(clean_vals) == 1 and isinstance(clean_vals[0], str) and ',' in clean_vals[0]:
+                        return [v.strip() for v in clean_vals[0].split(',')]
+                    return clean_vals
             except:
                 pass
     return default_list
@@ -124,13 +118,13 @@ base_pendapatan_total = safe_num(get_val_flex(df_desa, ['pendapatan_total', 'tot
 base_pengunjung_hari_ini = clean_num_str(get_val_flex(df_desa, ['pengunjung_hari_ini', 'pengunjung_harian', 'hari_ini'], 176))
 base_tiket_val = safe_num(get_val_flex(df_desa, ['tiket_val', 'tiket', 'pendapatan_tiket'], 78.4), 78.4)
 
-# Variabel yang sebelumnya belum berubah (Pokdarwis, Pengelola, UMKM, dll)
 pokdarwis_val = clean_num_str(get_val_flex(df_desa, ['pokdarwis', 'pokdarwis_val', 'jumlah_pokdarwis'], 3))
 pengelola_val = clean_num_str(get_val_flex(df_desa, ['pengelola', 'pengelola_val', 'jumlah_pengelola'], 27))
-base_umkm_val = clean_num_str(get_val_flex(df_desa, ['umkm_aktif_val', 'umkm', 'umkm_aktif', 'jumlah_umkm'], 42))
-event_val = clean_num_str(get_val_flex(df_desa, ['event_val', 'event', 'jumlah_event'], 8))
-mitra_val = clean_num_str(get_val_flex(df_desa, ['mitra_val', 'mitra', 'jumlah_mitra'], 12))
-relawan_val = clean_num_str(get_val_flex(df_desa, ['relawan_val', 'relawan', 'jumlah_relawan'], 36))
+base_umkm_val = clean_num_str(get_val_flex(df_desa, ['umkm', 'umkm_aktif', 'jumlah_umkm'], 42))
+event_val = clean_num_str(get_val_flex(df_desa, ['event', 'jumlah_event'], 8))
+mitra_val = clean_num_str(get_val_flex(df_desa, ['mitra', 'jumlah_mitra', 'mitra kerja sama'], 12))
+relawan_val = clean_num_str(get_val_flex(df_desa, ['relawan', 'jumlah_relawan'], 36))
+homestay_val = clean_num_str(get_val_flex(df_desa, ['homestay', 'jumlah_homestay'], 15))
 
 base_ig = clean_num_str(get_val_flex(df_desa, ['ig_followers', 'instagram', 'ig', 'followers_ig'], '3842'))
 base_tiktok = clean_num_str(get_val_flex(df_desa, ['tiktok', 'tiktok_followers', 'pengikut_tiktok'], '2156'))
@@ -157,6 +151,19 @@ filter_tahun = st.sidebar.selectbox("📅 Tahun", ["Semua", "2026", "2025", "202
 filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])
 filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
 filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
+
+# --- TOMBOL REFRESH SHAPE / IKON MINIMALIS DI BAWAH FILTER ---
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+st.sidebar.markdown("""
+    <div style="text-align: center; color: #E0E0E0; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+        PENGATURAN DATA
+    </div>
+""", unsafe_allow_html=True)
+
+if st.sidebar.button("🔄 Perbarui Data Spreadsheet", use_container_width=True):
+    st.cache_data.clear()
+    st.success("Cache dibersihkan! Data diperbarui.")
+    st.rerun()
 
 # --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
 multiplier = 1.0
@@ -209,7 +216,7 @@ trend_data = [max(10, int(safe_num(val, 100) * multiplier)) for val in base_tren
 base_facility = get_list_flex(df_desa, ['fasilitas_unit', 'fasilitas'], [2, 4, 2, 6, 8, 12])
 facility_data = [max(1, int(safe_num(val, 2) * (multiplier ** 0.5))) for val in base_facility]
 
-base_revenue = get_list_flex(df_desa, ['pendapatan_kategori', 'pendapatan_kategori'], [68, 22, 18, 15, 28])
+base_revenue = get_list_flex(df_desa, ['pendapatan_kategori', 'pendapatan'], [68, 22, 18, 15, 28])
 revenue_data = [round(safe_num(val, 10.0) * multiplier, 1) for val in base_revenue]
 
 base_expense = [35, 28, 18, 16, 15]
@@ -220,7 +227,7 @@ if filter_jenis_wisatawan == "Lampung":
 elif filter_jenis_wisatawan == "Luar Lampung":
     origin_data = [12, 36, 26, 16, 10]
 else:
-    base_origin = get_list_flex(df_desa, ['asal_wisatawan_pct', 'asal_wisatawan'], [55, 17, 10, 7, 6])
+    base_origin = get_list_flex(df_desa, ['asal_wisatawan', 'asal'], [55, 17, 10, 7, 6])
     origin_data = [safe_int(x, 10) for x in base_origin]
 
 base_promo = [35, 25, 15, 15, 10]
@@ -237,14 +244,6 @@ event_dates = get_list_flex(df_desa, ['event_tanggal', 'tanggal_event'], ["14 Ja
 event_names = get_list_flex(df_desa, ['event_nama', 'nama_event'], ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"])
 current_events = list(zip(event_dates, event_names))
 event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
-
-st.sidebar.markdown("<br>", unsafe_allow_html=True)
-st.sidebar.markdown(f"""
-    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); text-align: center;">
-        <p style="font-size: 10px; font-weight: 700; color: #FFD700; margin:0; text-transform: uppercase;">Status Filter Aktif</p>
-        <p style="font-size: 10px; font-weight: 600; color: white; margin: 3px 0 0 0;">Tahun: {filter_tahun} | Bulan: {filter_bulan} <br> Wisatawan: {filter_jenis_wisatawan} | Jenis: {filter_jenis}</p>
-    </div>
-""", unsafe_allow_html=True)
 
 # 3. Styling CSS untuk Sidebar & Konsistensi Tampilan
 st.markdown("""
@@ -370,7 +369,7 @@ dashboard_html = f"""
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-ticket"></i></div><div class="m-title">Tiket</div><div class="m-value">{tiket_val}</div><div class="m-sub">Juta Rp</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-star"></i></div><div class="m-title">Kepuasan</div><div class="m-value">88%</div><div class="m-sub">Sangat Baik</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-store"></i></div><div class="m-title">UMKM</div><div class="m-value">{umkm_aktif_val}</div><div class="m-sub">Unit</div></div>
-                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-house"></i></div><div class="m-title">Homestay</div><div class="m-value">15</div><div class="m-sub">Unit</div></div>
+                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-house"></i></div><div class="m-title">Homestay</div><div class="m-value">{homestay_val}</div><div class="m-sub">Unit</div></div>
                 </div>
             </div>
             <div class="card-box">
@@ -442,7 +441,7 @@ dashboard_html = f"""
                 </div>
             </div>
             <div class="card-box">
-                <div class="section-title"><i class="fa-solid fa-calendar-days" style="color: #1565C0;"></i> Jadwal Event Desa (Dari Spreadsheet)</div>
+                <div class="section-title"><i class="fa-solid fa-calendar-days" style="color: #1565C0;"></i> Jadwal Event Desa</div>
                 <div class="event-list">
                     {event_html_items}
                 </div>
@@ -452,7 +451,7 @@ dashboard_html = f"""
                 <canvas id="revenueChart" height="115"></canvas>
             </div>
             <div class="card-box">
-                <div class="section-title"><i class="fa-solid fa-wallet" style="color: #1565C0;"></i> Pengeluaran Pariwisata (Bar Chart)</div>
+                <div class="section-title"><i class="fa-solid fa-wallet" style="color: #1565C0;"></i> Pengeluaran Pariwisata</div>
                 <canvas id="expenseChart" height="115"></canvas>
             </div>
             <div class="card-box">
@@ -560,7 +559,7 @@ dashboard_html = f"""
                 labels: ['Kebersihan', 'Jalan', 'Toilet', 'Parkir', 'Informasi'],
                 datasets: [{{ data: [28, 22, 20, 15, 9], backgroundColor: '#388E3C', borderRadius: 4 }}]
             }},
-            options: {{ indexAxis: 'y', responsive: true, plugins: {{ legend: {{ display: false }} }} }}
+            options: {{ indexAxis: 'y', responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ x: {{ beginAtZero: true }} }} }}
         }});
         new Chart(document.getElementById('revenueChart').getContext('2d'), {{
             type: 'bar',
@@ -576,7 +575,7 @@ dashboard_html = f"""
                 labels: ['Kebersihan', 'Perawatan', 'Promosi', 'SDM', 'Infrastruktur'],
                 datasets: [{{ data: expenseValues, backgroundColor: '#42A5F5', borderRadius: 4 }}]
             }},
-            options: {{ responsive: true, plugins: {{ legend: {{ beginAtZero: true }} }} }}
+            options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
         new Chart(document.getElementById('originChart').getContext('2d'), {{
             type: 'bar',
@@ -604,9 +603,9 @@ dashboard_html = f"""
                     {{ label: 'Shares', data: engShares, borderColor: '#BA68C8', tension: 0.3, pointRadius: 2 }}
                 ]
             }},
-            options: {{ responsive: true, plugins: {{ legend: {{ position: 'bottom', labels: {{ boxWidth: 6, font: {{ size: 8 }} }} }} }} }}
+            options: {{ responsive: true, plugins: {{ legend: {{ position: 'bottom', labels: {{ boxWidth: 6, font: {{ size: 8 }} }} }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
-        newChart(document.getElementById('sourceChart').getContext('2d'), {{
+        new Chart(document.getElementById('sourceChart').getContext('2d'), {{
             type: 'bar',
             data: {{
                 labels: ['Sosmed', 'Teman', 'Berita', 'Event', 'Lainnya'],
