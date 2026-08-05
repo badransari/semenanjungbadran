@@ -48,6 +48,18 @@ def get_list_col(df, col_name, default_list):
             return default_list
     return default_list
 
+def clean_num_str(val_str):
+    if pd.isna(val_str):
+        return 1000
+    cleaned = str(val_str).replace(".", "").replace(",", "").replace(" ", "")
+    try:
+        return int(cleaned)
+    except:
+        return 1000
+
+def format_id_num(val):
+    return f"{int(val):,}".replace(",", ".")
+
 # Ekstraksi Data Dasar dari Spreadsheet
 base_total_pengunjung = int(get_val(df_desa, 'total_pengunjung', 4922))
 base_pendapatan_total = float(get_val(df_desa, 'pendapatan_total', 152.7))
@@ -60,11 +72,10 @@ event_val = int(get_val(df_desa, 'event_val', 8))
 mitra_val = int(get_val(df_desa, 'mitra_val', 12))
 relawan_val = int(get_val(df_desa, 'relawan_val', 36))
 
-ig_followers_val = str(get_val(df_desa, 'ig_followers', '3.842'))
-tiktok_val = str(get_val(df_desa, 'tiktok', '2.156'))
-fb_reach_val = str(get_val(df_desa, 'fb_reach', '8.745'))
-website_val = str(get_val(df_desa, 'website', '5.231'))
-review_val = int(get_val(df_desa, 'review_val', 157))
+base_ig = clean_num_str(get_val(df_desa, 'ig_followers', '3842'))
+base_tiktok = clean_num_str(get_val(df_desa, 'tiktok', '2156'))
+base_fb = clean_num_str(get_val(df_desa, 'fb_reach', '8745'))
+base_web = clean_num_str(get_val(df_desa, 'website', '5231'))
 
 lampung_base = int(get_val(df_desa, 'propinsi_lampung_pct', 75))
 luar_base = int(get_val(df_desa, 'propinsi_luar_pct', 25))
@@ -127,6 +138,12 @@ pengunjung_hari_ini_val = int(base_pengunjung_hari_ini * multiplier)
 tiket_val = round(base_tiket_val * multiplier, 1)
 umkm_aktif_val = int(base_umkm_val * (0.9 if multiplier < 1 else 1))
 
+# Sosial Media Dinamis Berdasarkan Filter
+ig_followers_val = format_id_num(base_ig * multiplier)
+tiktok_val = format_id_num(base_tiktok * multiplier)
+fb_reach_val = format_id_num(base_fb * multiplier)
+website_val = format_id_num(base_web * multiplier)
+
 # Skala Data Grafik berdasarkan Filter
 base_trend = get_list_col(df_desa, 'trend_pengunjung', [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
 trend_data = [max(10, int(val * multiplier)) for val in base_trend]
@@ -137,6 +154,9 @@ facility_data = [max(1, int(val * (multiplier ** 0.5))) for val in base_facility
 base_revenue = get_list_col(df_desa, 'pendapatan_kategori', [68, 22, 18, 15, 28])
 revenue_data = [round(val * multiplier, 1) for val in base_revenue]
 
+base_expense = [35, 28, 18, 16, 15]
+expense_data = [round(val * multiplier, 1) for val in base_expense]
+
 if filter_jenis_wisatawan == "Lampung":
     origin_data = [92, 4, 2, 1, 1]
 elif filter_jenis_wisatawan == "Luar Lampung":
@@ -144,7 +164,15 @@ elif filter_jenis_wisatawan == "Luar Lampung":
 else:
     origin_data = get_list_col(df_desa, 'asal_wisatawan_pct', [55, 17, 10, 7, 6])
 
-promo_data = get_list_col(df_desa, 'promo_kontribusi', [35, 25, 15, 15, 10])
+base_promo = get_list_col(df_desa, 'promo_kontribusi', [35, 25, 15, 15, 10])
+promo_data = [max(5, int(val * (multiplier ** 0.3))) for val in base_promo]
+
+base_likes = [1200, 1500, 2100, 2800, 3200, 3900]
+base_comments = [300, 450, 600, 800, 950, 1100]
+base_shares = [150, 220, 340, 450, 520, 680]
+eng_likes = [max(50, int(v * multiplier)) for v in base_likes]
+eng_comments = [max(10, int(v * multiplier)) for v in base_comments]
+eng_shares = [max(5, int(v * multiplier)) for v in base_shares]
 
 event_dates = get_list_col(df_desa, 'event_tanggal', ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"])
 event_names = get_list_col(df_desa, 'event_nama', ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"])
@@ -366,7 +394,7 @@ dashboard_html = f"""
                 <canvas id="revenueChart" height="115"></canvas>
             </div>
             <div class="card-box">
-                <div class="section-title"><i class="fa-solid fa-wallet" style="color: #1565C0;"></i> Pengeluaran Pariwisata</div>
+                <div class="section-title"><i class="fa-solid fa-wallet" style="color: #1565C0;"></i> Pengeluaran Pariwisata (Bar Chart)</div>
                 <canvas id="expenseChart" height="115"></canvas>
             </div>
             <div class="card-box">
@@ -381,7 +409,7 @@ dashboard_html = f"""
             </div>
         </div>
 
-        <!-- KOLOM 3: PEMASARAN PARIWISATA (LENGKAP DENGAN KEPUASAN & PROMOSI DI BAWAH) -->
+        <!-- KOLOM 3: PEMASARAN PARIWISATA -->
         <div class="column-box">
             <div class="card-box">
                 <div class="col-header bg-purple"><i class="fa-solid fa-bullhorn"></i> 3. Pemasaran & Promosi</div>
@@ -410,7 +438,7 @@ dashboard_html = f"""
                 <div class="section-title"><i class="fa-solid fa-circle-info" style="color: #4A148C;"></i> Sumber Informasi Wisatawan</div>
                 <canvas id="sourceChart" height="115"></canvas>
             </div>
-            <!-- KEPUASAN PROMOSI (Ditempatkan di Kanan Bawah, Dibawah Chart Sumber Informasi Wisatawan) -->
+            <!-- KEPUASAN PROMOSI (Kanan Bawah) -->
             <div class="card-box">
                 <div class="section-title"><i class="fa-solid fa-face-smile-star" style="color: #4A148C;"></i> Kepuasan Promosi & Dampak Kampanye</div>
                 <div style="background: #F3E5F5; padding: 10px; border-radius: 6px; border: 1px solid #CE93D8; text-align: center;">
@@ -447,8 +475,12 @@ dashboard_html = f"""
         const trendValues = {trend_data};
         const facilityValues = {facility_data};
         const revenueValues = {revenue_data};
+        const expenseValues = {expense_data};
         const originValues = {origin_data};
         const promoValues = {promo_data};
+        const engLikes = {eng_likes};
+        const engComments = {eng_comments};
+        const engShares = {eng_shares};
 
         new Chart(document.getElementById('trendChart').getContext('2d'), {{
             type: 'line',
@@ -487,12 +519,12 @@ dashboard_html = f"""
         }});
 
         new Chart(document.getElementById('expenseChart').getContext('2d'), {{
-            type: 'doughnut',
+            type: 'bar',
             data: {{
-                labels: ['Kebersihan (30%)', 'Perawatan (25%)', 'Promosi (15%)', 'SDM (15%)', 'Infrastruktur (15%)'],
-                datasets: [{{ data: [30, 25, 15, 15, 15], backgroundColor: ['#1565C0', '#42A5F5', '#90CAF9', '#BBDEFB', '#E3F2FD'] }}]
+                labels: ['Kebersihan', 'Perawatan', 'Promosi', 'SDM', 'Infrastruktur'],
+                datasets: [{{ data: expenseValues, backgroundColor: '#42A5F5', borderRadius: 4 }}]
             }},
-            options: {{ responsive: true, plugins: {{ legend: {{ position: 'right', labels: {{ boxWidth: 8, font: {{ size: 8 }} }} }} }} }}
+            options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
 
         new Chart(document.getElementById('originChart').getContext('2d'), {{
@@ -518,9 +550,9 @@ dashboard_html = f"""
             data: {{
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
                 datasets: [
-                    {{ label: 'Likes', data: [1200, 1500, 2100, 2800, 3200, 3900], borderColor: '#4A148C', tension: 0.3, pointRadius: 2 }},
-                    {{ label: 'Comments', data: [300, 450, 600, 800, 950, 1100], borderColor: '#7B1FA2', tension: 0.3, pointRadius: 2 }},
-                    {{ label: 'Shares', data: [150, 220, 340, 450, 520, 680], borderColor: '#BA68C8', tension: 0.3, pointRadius: 2 }}
+                    {{ label: 'Likes', data: engLikes, borderColor: '#4A148C', tension: 0.3, pointRadius: 2 }},
+                    {{ label: 'Comments', data: engComments, borderColor: '#7B1FA2', tension: 0.3, pointRadius: 2 }},
+                    {{ label: 'Shares', data: engShares, borderColor: '#BA68C8', tension: 0.3, pointRadius: 2 }}
                 ]
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ position: 'bottom', labels: {{ boxWidth: 6, font: {{ size: 8 }} }} }} }} }}
