@@ -3,6 +3,7 @@ import pandas as pd
 import random
 import warnings
 import streamlit.components.v1 as components
+
 warnings.filterwarnings('ignore')
 
 # 1. Konfigurasi Halaman (Wide Layout & Clean Padding)
@@ -16,17 +17,27 @@ st.set_page_config(
 # --- KONEKSI SUMBER DATA (GOOGLE SHEETS CSV ANDA) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv"
 
-@st.cache_data(ttl=5) # Cache singkat agar update spreadsheet langsung terasa
+# Menggunakan TTL 0 agar selalu mengecek pembaruan, ditambah tombol refresh manual
+@st.cache_data(ttl=0) 
 def load_desa_data(url):
     if not url:
         return None
     try:
         df = pd.read_csv(url)
         return df
-    except Exception:
+    except Exception as e:
+        st.error(f"Gagal memuat data dari Spreadsheet: {e}")
         return None
 
 df_desa = load_desa_data(SHEET_URL)
+
+# --- TOMBOL REFRESH MANUAL UNTUK DESA ---
+st.sidebar.markdown("---")
+if st.sidebar.button("🔄 Refresh Data Spreadsheet", use_container_width=True):
+    st.cache_data.clear()
+    st.success("Cache berhasil dibersihkan! Data diperbarui.")
+    st.rerun()
+st.sidebar.markdown("---")
 
 # --- FUNGSI AMBIL DATA & KONVERSI AMAN (ANTI-ERROR) ---
 def get_val_flex(df, key_candidates, default_val):
@@ -36,6 +47,7 @@ def get_val_flex(df, key_candidates, default_val):
         key_candidates = [key_candidates]
     norm_candidates = [str(k).strip().lower() for k in key_candidates]
     
+    # 1. Cek berdasarkan nama kolom (Header)
     for col in df.columns:
         if str(col).strip().lower() in norm_candidates:
             try:
@@ -45,6 +57,7 @@ def get_val_flex(df, key_candidates, default_val):
             except:
                 pass
                 
+    # 2. Cek berdasarkan baris (Format Key-Value: Kolom 0 = Kunci, Kolom 1 = Nilai)
     if len(df.columns) >= 2:
         key_col = df.columns[0]
         val_col = df.columns[1]
@@ -105,12 +118,13 @@ def clean_num_str(val_str):
 def format_id_num(val):
     return f"{int(val):,}".replace(",", ".")
 
-# Ekstraksi Data Dasar dari Spreadsheet
+# --- EKSTRAKSI DATA DASAR DARI SPREADSHEET ---
 base_total_pengunjung = clean_num_str(get_val_flex(df_desa, ['total_pengunjung', 'pengunjung', 'jumlah_pengunjung'], 4922))
 base_pendapatan_total = safe_num(get_val_flex(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
 base_pengunjung_hari_ini = clean_num_str(get_val_flex(df_desa, ['pengunjung_hari_ini', 'pengunjung_harian', 'hari_ini'], 176))
 base_tiket_val = safe_num(get_val_flex(df_desa, ['tiket_val', 'tiket', 'pendapatan_tiket'], 78.4), 78.4)
 
+# Variabel yang sebelumnya belum berubah (Pokdarwis, Pengelola, UMKM, dll)
 pokdarwis_val = clean_num_str(get_val_flex(df_desa, ['pokdarwis', 'pokdarwis_val', 'jumlah_pokdarwis'], 3))
 pengelola_val = clean_num_str(get_val_flex(df_desa, ['pengelola', 'pengelola_val', 'jumlah_pengelola'], 27))
 base_umkm_val = clean_num_str(get_val_flex(df_desa, ['umkm_aktif_val', 'umkm', 'umkm_aktif', 'jumlah_umkm'], 42))
@@ -184,13 +198,11 @@ pengunjung_hari_ini_val = int(base_pengunjung_hari_ini * multiplier)
 tiket_val = round(base_tiket_val * multiplier, 1)
 umkm_aktif_val = int(base_umkm_val * (0.9 if multiplier < 1 else 1))
 
-# Sosial Media Dinamis Berdasarkan Filter
 ig_followers_val = format_id_num(base_ig * multiplier)
 tiktok_val = format_id_num(base_tiktok * multiplier)
 fb_reach_val = format_id_num(base_fb * multiplier)
 website_val = format_id_num(base_web * multiplier)
 
-# Skala Data Grafik Berbasis Safe Parsing
 base_trend = get_list_flex(df_desa, ['trend_pengunjung', 'trend'], [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
 trend_data = [max(10, int(safe_num(val, 100) * multiplier)) for val in base_trend]
 
@@ -404,7 +416,6 @@ dashboard_html = f"""
                 </div>
             </div>
         </div>
-
         <!-- KOLOM 2: MANAJEMEN PARIWISATA -->
         <div class="column-box">
             <div class="card-box">
@@ -455,7 +466,6 @@ dashboard_html = f"""
                 </div>
             </div>
         </div>
-
         <!-- KOLOM 3: PEMASARAN PARIWISATA -->
         <div class="column-box">
             <div class="card-box">
@@ -485,7 +495,6 @@ dashboard_html = f"""
                 <div class="section-title"><i class="fa-solid fa-circle-info" style="color: #4A148C;"></i> Sumber Informasi Wisatawan</div>
                 <canvas id="sourceChart" height="115"></canvas>
             </div>
-            <!-- KEPUASAN PROMOSI (Kanan Bawah) -->
             <div class="card-box">
                 <div class="section-title"><i class="fa-solid fa-face-smile-star" style="color: #4A148C;"></i> Kepuasan Promosi & Dampak Kampanye</div>
                 <div style="background: #F3E5F5; padding: 10px; border-radius: 6px; border: 1px solid #CE93D8; text-align: center;">
@@ -497,7 +506,7 @@ dashboard_html = f"""
             </div>
         </div>
     </div>
-
+    
     <!-- FOOTER SLOGAN -->
     <div class="footer-banner">
         <div class="siger-img-box"><img class="siger-img" src="https://traverse.id/wp-content/uploads/2018/03/Mahkota-Siger-Simbol-Kebanggaan-Lampung.jpg" alt="Siger"></div>
@@ -537,7 +546,6 @@ dashboard_html = f"""
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
-
         new Chart(document.getElementById('facilityChart').getContext('2d'), {{
             type: 'bar',
             data: {{
@@ -546,7 +554,6 @@ dashboard_html = f"""
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
-
         new Chart(document.getElementById('complaintChart').getContext('2d'), {{
             type: 'bar',
             data: {{
@@ -555,7 +562,6 @@ dashboard_html = f"""
             }},
             options: {{ indexAxis: 'y', responsive: true, plugins: {{ legend: {{ display: false }} }} }}
         }});
-
         new Chart(document.getElementById('revenueChart').getContext('2d'), {{
             type: 'bar',
             data: {{
@@ -564,16 +570,14 @@ dashboard_html = f"""
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
-
         new Chart(document.getElementById('expenseChart').getContext('2d'), {{
             type: 'bar',
             data: {{
                 labels: ['Kebersihan', 'Perawatan', 'Promosi', 'SDM', 'Infrastruktur'],
                 datasets: [{{ data: expenseValues, backgroundColor: '#42A5F5', borderRadius: 4 }}]
             }},
-            options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
+            options: {{ responsive: true, plugins: {{ legend: {{ beginAtZero: true }} }} }}
         }});
-
         new Chart(document.getElementById('originChart').getContext('2d'), {{
             type: 'bar',
             data: {{
@@ -582,7 +586,6 @@ dashboard_html = f"""
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
-
         new Chart(document.getElementById('promoChart').getContext('2d'), {{
             type: 'bar',
             data: {{
@@ -591,7 +594,6 @@ dashboard_html = f"""
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }} }} }}
         }});
-
         new Chart(document.getElementById('engagementChart').getContext('2d'), {{
             type: 'line',
             data: {{
@@ -604,8 +606,7 @@ dashboard_html = f"""
             }},
             options: {{ responsive: true, plugins: {{ legend: {{ position: 'bottom', labels: {{ boxWidth: 6, font: {{ size: 8 }} }} }} }} }}
         }});
-
-        new Chart(document.getElementById('sourceChart').getContext('2d'), {{
+        newChart(document.getElementById('sourceChart').getContext('2d'), {{
             type: 'bar',
             data: {{
                 labels: ['Sosmed', 'Teman', 'Berita', 'Event', 'Lainnya'],
