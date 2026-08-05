@@ -16,6 +16,7 @@ st.set_page_config(
 
 # --- KONEKSI SUMBER DATA (GOOGLE SHEETS CSV ANDA) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv"
+SHEET_MANAJEMEN_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv&gid=191716433"
 
 @st.cache_data(ttl=0) 
 def load_desa_data(url):
@@ -29,6 +30,7 @@ def load_desa_data(url):
         return None
 
 df_desa = load_desa_data(SHEET_URL)
+df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
 
 # --- FUNGSI AMBIL DATA YANG AKURAT & AMAN DARI SPREADSHEET ---
 def get_col_val(df, col_keywords, default_val):
@@ -77,13 +79,33 @@ def format_rupiah(val):
         val_int = 0
     return f"Rp {val_int:,}".replace(",", ".")
 
-# --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
+# --- SIDEBAR: GAMBAR & JUDUL DI ATAS ---
+st.sidebar.markdown("""
+    <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
+            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
+                Desa Wisata Semenanjung Badran
+            </h3>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("<hr style='border-color: rgba(255,255,255,0.2); margin: 10px 0;'>", unsafe_allow_html=True)
+
+# Filter Data di Sidebar
 filter_tahun = st.sidebar.selectbox("📅 Tahun", ["Semua", "2026", "2025", "2024"])
 filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])
 filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
 filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
 
-# Multiplier berdasarkan Tahun & Jenis Wisatawan
+st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.2);'>", unsafe_allow_html=True)
+if st.sidebar.button("🔄 Perbarui Data", use_container_width=True):
+    st.cache_data.clear()
+    st.success("Data berhasil disinkronkan ulang!")
+    st.rerun()
+
+# --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
 multiplier = 1.0
 if filter_tahun == "2025": 
     multiplier *= 0.85
@@ -102,7 +124,7 @@ else:
     lampung_prop = 75
     luar_prop = 25
 
-# Hitung Tren Kunjungan Bulanan & Total Pengunjung (Sum 1 Tahun / Filter)
+# Hitung Tren Kunjungan Bulanan & Total Pengunjung
 base_monthly = [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680]
 months_list = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 
@@ -112,35 +134,30 @@ if filter_bulan != "Semua":
 else:
     trend_data = [int(v * multiplier) for v in base_monthly]
 
-# Total Pengunjung adalah SUM dari seluruh data yang difilter
 total_pengunjung_val = sum(trend_data)
 if total_pengunjung_val == 0:
     total_pengunjung_val = int(safe_int(get_col_val(df_desa, ['total_pengunjung', 'pengunjung'], 4922), 4922) * multiplier)
 
 pengunjung_hari_ini_val = max(15, int(total_pengunjung_val / 45))
-
 base_pendapatan_total = safe_num(get_col_val(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
 pendapatan_total_val = int(base_pendapatan_total * 1_000_000 * multiplier)
 pendapatan_formatted_str = format_rupiah(pendapatan_total_val)
 
-# Format Tiket (Contoh: Rp 10.000 atau dari data spreadsheet)
-base_tiket_num = safe_num(get_col_val(df_desa, ['tiket_val', 'tiket'], 10000), 10000)
-if base_tiket_num < 100000:
-    tiket_val_num = int(base_tiket_num * 1_000_000 * multiplier)
-else:
-    tiket_val_num = int(base_tiket_num * multiplier)
+# Pengambilan Tiket dari Sheet 'Data Manajemen' (Cell J3)
+base_tiket_num = safe_num(get_col_val(df_manajemen, ['harga tiket', 'tiket'], 10000), 10000)
+tiket_val_num = int(base_tiket_num)
 tiket_formatted_str = format_rupiah(tiket_val_num)
 
-pokdarwis_val = safe_int(get_col_val(df_desa, ['pokdarwis'], 9), 9)
-pengelola_val = safe_int(get_col_val(df_desa, ['pengelola'], 27), 27)
-umkm_aktif_val = safe_int(get_col_val(df_desa, ['umkm aktif', 'umkm'], 42), 42)
-mitra_val = safe_int(get_col_val(df_desa, ['mitra kerja sama', 'mitra'], 12), 12)
-relawan_val = safe_int(get_col_val(df_desa, ['relawan'], 36), 36)
-homestay_val = safe_int(get_col_val(df_desa, ['jumlah homestay', 'homestay'], 15), 15)
-event_val = safe_int(get_col_val(df_desa, ['event', 'jumlah_event'], 8), 8)
-
-keterlibatan_masyarakat = safe_int(get_col_val(df_desa, ['tingkat keterlibatan', 'keterlibatan'], 78), 78)
-kepuasan_wisatawan = safe_int(get_col_val(df_desa, ['tingkat kepuasan', 'kepuasan'], 88), 88)
+# Manajemen Data dari Sheet 'Data Manajemen'
+pokdarwis_val = safe_int(get_col_val(df_manajemen, ['pokdarwis'], 9), 9)
+pengelola_val = safe_int(get_col_val(df_manajemen, ['pengelola'], 27), 27)
+umkm_aktif_val = safe_int(get_col_val(df_manajemen, ['mkm aktif', 'umkm aktif', 'umkm'], 42), 42)
+mitra_val = safe_int(get_col_val(df_manajemen, ['mitra kerja sama', 'mitra'], 12), 12)
+relawan_val = safe_int(get_col_val(df_manajemen, ['relawan'], 36), 36)
+homestay_val = safe_int(get_col_val(df_manajemen, ['jumlah homestay', 'homestay'], 15), 15)
+event_val = safe_int(get_col_val(df_manajemen, ['event', 'jumlah_event'], 8), 8)
+keterlibatan_masyarakat = safe_int(get_col_val(df_manajemen, ['tingkat keterlibatan', 'keterlibatan'], 78), 78)
+kepuasan_wisatawan = safe_int(get_col_val(df_manajemen, ['tingkat kepuasan', 'kepuasan'], 88), 88)
 
 ig_followers_val = format_id_num(safe_int(get_col_val(df_desa, ['ig_followers', 'instagram', 'ig'], 3842), 3842) * multiplier)
 tiktok_val = format_id_num(safe_int(get_col_val(df_desa, ['tiktok'], 2156), 2156) * multiplier)
@@ -152,7 +169,6 @@ revenue_data = [round(val * multiplier, 1) for val in [68, 22, 18, 15, 28]]
 expense_data = [round(val * multiplier, 1) for val in [35, 28, 18, 16, 15]]
 origin_data = [55, 17, 10, 7, 6]
 promo_data = [35, 25, 15, 15, 10]
-
 eng_likes = [max(50, int(v * multiplier)) for v in [1200, 1500, 2100, 2800, 3200, 3900]]
 eng_comments = [max(10, int(v * multiplier)) for v in [300, 450, 600, 800, 950, 1100]]
 eng_shares = [max(5, int(v * multiplier)) for v in [150, 220, 340, 450, 520, 680]]
@@ -161,24 +177,6 @@ event_dates = ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"]
 event_names = ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"]
 current_events = list(zip(event_dates, event_names))
 event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
-
-# 2. Sidebar Filter Data & Tombol Refresh di Kiri Bawah Filter
-st.sidebar.markdown("""
-    <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
-        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
-            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
-                Desa Wisata Semenanjung Badran
-            </h3>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
-st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.2);'>", unsafe_allow_html=True)
-if st.sidebar.button("🔄 Perbarui Data", use_container_width=True):
-    st.cache_data.clear()
-    st.success("Data berhasil disinkronkan ulang!")
-    st.rerun()
 
 # 3. Styling CSS
 st.markdown("""
@@ -350,7 +348,6 @@ dashboard_html = f"""
                 </div>
             </div>
         </div>
-
         <!-- KOLOM 2 -->
         <div class="column-box">
             <div class="card-box">
@@ -401,7 +398,6 @@ dashboard_html = f"""
                 </div>
             </div>
         </div>
-
         <!-- KOLOM 3 -->
         <div class="column-box">
             <div class="card-box">
@@ -452,7 +448,6 @@ dashboard_html = f"""
         </div>
         <div class="siger-img-box"><img class="siger-img" src="https://traverse.id/wp-content/uploads/2018/03/Mahkota-Siger-Simbol-Kebanggaan-Lampung.jpg" alt="Siger"></div>
     </div>
-
     <script>
         let currentSlideIdx = 0;
         function showSlide(idx) {{
