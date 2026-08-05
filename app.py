@@ -71,83 +71,24 @@ def format_id_num(val):
     return f"{int(val):,}".replace(",", ".")
 
 def format_rupiah(val):
-    if val < 10000:
-        full_val = int(val * 1_000_000)
-    else:
-        full_val = int(val)
-    return f"Rp {full_val:,}".replace(",", ".")
+    try:
+        val_int = int(val)
+    except:
+        val_int = 0
+    return f"Rp {val_int:,}".replace(",", ".")
 
-# --- EKSTRAKSI DATA DARI SPREADSHEET DENGAN DEFAULT YANG STABIL ---
-base_total_pengunjung = safe_int(get_col_val(df_desa, ['total_pengunjung', 'pengunjung', 'jumlah_pengunjung'], 4922), 4922)
-base_pendapatan_total = safe_num(get_col_val(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
-base_pengunjung_hari_ini = safe_int(get_col_val(df_desa, ['pengunjung_hari_ini', 'hari_ini'], 176), 176)
-base_tiket_val = safe_num(get_col_val(df_desa, ['tiket_val', 'tiket'], 78.4), 78.4)
-
-pokdarwis_val = safe_int(get_col_val(df_desa, ['pokdarwis'], 9), 9)
-pengelola_val = safe_int(get_col_val(df_desa, ['pengelola'], 27), 27)
-base_umkm_val = safe_int(get_col_val(df_desa, ['umkm aktif', 'umkm'], 42), 42)
-mitra_val = safe_int(get_col_val(df_desa, ['mitra kerja sama', 'mitra'], 12), 12)
-relawan_val = safe_int(get_col_val(df_desa, ['relawan'], 36), 36)
-homestay_val = safe_int(get_col_val(df_desa, ['jumlah homestay', 'homestay'], 15), 15)
-event_val = safe_int(get_col_val(df_desa, ['event', 'jumlah_event'], 8), 8)
-
-keterlibatan_masyarakat = safe_int(get_col_val(df_desa, ['tingkat keterlibatan', 'keterlibatan'], 78), 78)
-kepuasan_wisatawan = safe_int(get_col_val(df_desa, ['tingkat kepuasan', 'kepuasan'], 88), 88)
-
-base_ig = safe_int(get_col_val(df_desa, ['ig_followers', 'instagram', 'ig'], 3842), 3842)
-base_tiktok = safe_int(get_col_val(df_desa, ['tiktok'], 2156), 2156)
-base_fb = safe_int(get_col_val(df_desa, ['fb_reach', 'facebook', 'fb'], 8745), 8745)
-base_web = safe_int(get_col_val(df_desa, ['website', 'web'], 5231), 5231)
-
-lampung_base = 75
-luar_base = 25
-
-# 2. Sidebar Filter Data & Tombol Refresh di Kiri Bawah Filter
-st.sidebar.markdown("""
-    <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
-        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
-            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
-                Desa Wisata Semenanjung Badran
-            </h3>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
-st.sidebar.markdown('### <i class="fa-solid fa-filter"></i> FILTER DATA', unsafe_allow_html=True)
+# --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
 filter_tahun = st.sidebar.selectbox("📅 Tahun", ["Semua", "2026", "2025", "2024"])
 filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])
 filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
 filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
 
-st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.2);'>", unsafe_allow_html=True)
-st.sidebar.markdown("""
-    <div style="text-align: center; margin-bottom: 6px;">
-        <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; color: #FFD700; border: 1px solid rgba(255,255,255,0.2);">
-            🔄 Sync Spreadsheet
-        </span>
-    </div>
-""", unsafe_allow_html=True)
-
-if st.sidebar.button("Perbarui Data", use_container_width=True):
-    st.cache_data.clear()
-    st.success("Data berhasil disinkronkan ulang!")
-    st.rerun()
-
-# --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
+# Multiplier berdasarkan Tahun & Jenis Wisatawan
 multiplier = 1.0
 if filter_tahun == "2025": 
     multiplier *= 0.85
 elif filter_tahun == "2024": 
     multiplier *= 0.70
-
-month_weights = {
-    "Semua": 1.0, "Jan": 0.08, "Feb": 0.07, "Mar": 0.09, 
-    "Apr": 0.10, "Mei": 0.12, "Jun": 0.11, "Jul": 0.10, 
-    "Agu": 0.09, "Sep": 0.07, "Okt": 0.06, "Nov": 0.08, "Des": 0.13
-}
-if filter_bulan != "Semua":
-    multiplier *= (month_weights.get(filter_bulan, 0.08) * 12)
 
 if filter_jenis_wisatawan == "Lampung":
     lampung_prop = 100
@@ -158,23 +99,54 @@ elif filter_jenis_wisatawan == "Luar Lampung":
     luar_prop = 100
     multiplier *= 0.25
 else:
-    lampung_prop = lampung_base
-    luar_prop = luar_base
+    lampung_prop = 75
+    luar_prop = 25
 
-total_pengunjung_val = int(base_total_pengunjung * multiplier)
-pendapatan_total_val = round(base_pendapatan_total * multiplier, 1)
+# Hitung Tren Kunjungan Bulanan & Total Pengunjung (Sum 1 Tahun / Filter)
+base_monthly = [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680]
+months_list = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+
+if filter_bulan != "Semua":
+    target_idx = months_list.index(filter_bulan) if filter_bulan in months_list else 0
+    trend_data = [int(v * multiplier) if i == target_idx else 0 for i, v in enumerate(base_monthly)]
+else:
+    trend_data = [int(v * multiplier) for v in base_monthly]
+
+# Total Pengunjung adalah SUM dari seluruh data yang difilter
+total_pengunjung_val = sum(trend_data)
+if total_pengunjung_val == 0:
+    total_pengunjung_val = int(safe_int(get_col_val(df_desa, ['total_pengunjung', 'pengunjung'], 4922), 4922) * multiplier)
+
+pengunjung_hari_ini_val = max(15, int(total_pengunjung_val / 45))
+
+base_pendapatan_total = safe_num(get_col_val(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
+pendapatan_total_val = int(base_pendapatan_total * 1_000_000 * multiplier)
 pendapatan_formatted_str = format_rupiah(pendapatan_total_val)
 
-pengunjung_hari_ini_val = int(base_pengunjung_hari_ini * multiplier)
-tiket_val = round(base_tiket_val * multiplier, 1)
-umkm_aktif_val = int(base_umkm_val * (0.9 if multiplier < 1 else 1))
+# Format Tiket (Contoh: Rp 10.000 atau dari data spreadsheet)
+base_tiket_num = safe_num(get_col_val(df_desa, ['tiket_val', 'tiket'], 10000), 10000)
+if base_tiket_num < 100000:
+    tiket_val_num = int(base_tiket_num * 1_000_000 * multiplier)
+else:
+    tiket_val_num = int(base_tiket_num * multiplier)
+tiket_formatted_str = format_rupiah(tiket_val_num)
 
-ig_followers_val = format_id_num(base_ig * multiplier)
-tiktok_val = format_id_num(base_tiktok * multiplier)
-fb_reach_val = format_id_num(base_fb * multiplier)
-website_val = format_id_num(base_web * multiplier)
+pokdarwis_val = safe_int(get_col_val(df_desa, ['pokdarwis'], 9), 9)
+pengelola_val = safe_int(get_col_val(df_desa, ['pengelola'], 27), 27)
+umkm_aktif_val = safe_int(get_col_val(df_desa, ['umkm aktif', 'umkm'], 42), 42)
+mitra_val = safe_int(get_col_val(df_desa, ['mitra kerja sama', 'mitra'], 12), 12)
+relawan_val = safe_int(get_col_val(df_desa, ['relawan'], 36), 36)
+homestay_val = safe_int(get_col_val(df_desa, ['jumlah homestay', 'homestay'], 15), 15)
+event_val = safe_int(get_col_val(df_desa, ['event', 'jumlah_event'], 8), 8)
 
-trend_data = [max(10, int(val * multiplier)) for val in [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680]]
+keterlibatan_masyarakat = safe_int(get_col_val(df_desa, ['tingkat keterlibatan', 'keterlibatan'], 78), 78)
+kepuasan_wisatawan = safe_int(get_col_val(df_desa, ['tingkat kepuasan', 'kepuasan'], 88), 88)
+
+ig_followers_val = format_id_num(safe_int(get_col_val(df_desa, ['ig_followers', 'instagram', 'ig'], 3842), 3842) * multiplier)
+tiktok_val = format_id_num(safe_int(get_col_val(df_desa, ['tiktok'], 2156), 2156) * multiplier)
+fb_reach_val = format_id_num(safe_int(get_col_val(df_desa, ['fb_reach', 'facebook', 'fb'], 8745), 8745) * multiplier)
+website_val = format_id_num(safe_int(get_col_val(df_desa, ['website', 'web'], 5231), 5231) * multiplier)
+
 facility_data = [2, 4, 2, 6, 8, 12]
 revenue_data = [round(val * multiplier, 1) for val in [68, 22, 18, 15, 28]]
 expense_data = [round(val * multiplier, 1) for val in [35, 28, 18, 16, 15]]
@@ -189,6 +161,24 @@ event_dates = ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"]
 event_names = ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"]
 current_events = list(zip(event_dates, event_names))
 event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
+
+# 2. Sidebar Filter Data & Tombol Refresh di Kiri Bawah Filter
+st.sidebar.markdown("""
+    <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
+            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
+                Desa Wisata Semenanjung Badran
+            </h3>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.2);'>", unsafe_allow_html=True)
+if st.sidebar.button("🔄 Perbarui Data", use_container_width=True):
+    st.cache_data.clear()
+    st.success("Data berhasil disinkronkan ulang!")
+    st.rerun()
 
 # 3. Styling CSS
 st.markdown("""
@@ -248,7 +238,7 @@ dashboard_html = f"""
         .m-card {{ background: #FAFAFA; border-radius: 6px; padding: 6px 4px; border: 1px solid #EAEAEA; text-align: center; height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; }}
         .m-icon {{ font-size: 11px; margin-bottom: 3px; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }}
         .m-title {{ font-size: 7.5px; font-weight: 800; color: #555; text-transform: uppercase; line-height: 1.2; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-        .m-value {{ font-size: 12px; font-weight: 800; color: #111; margin: 2px 0; }}
+        .m-value {{ font-size: 11px; font-weight: 800; color: #111; margin: 2px 0; }}
         .m-sub {{ font-size: 7px; font-weight: 700; color: #777; }}
         .section-title {{ font-size: 10.5px; font-weight: 800; color: #333; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; border-bottom: 2px solid #F0F0F0; padding-bottom: 4px; }}
         .proportion-container {{ margin-top: 6px; }}
@@ -290,7 +280,7 @@ dashboard_html = f"""
         <div class="stats-group">
             <div class="stat-item">
                 <span>👥 Total Pengunjung</span>
-                <strong>{total_pengunjung_val:,} Orang</strong>
+                <strong>{format_id_num(total_pengunjung_val)} Orang</strong>
             </div>
             <div class="stat-item">
                 <span>💰 Pendapatan</span>
@@ -311,7 +301,7 @@ dashboard_html = f"""
                 <div class="metric-subgrid">
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-users"></i></div><div class="m-title">Total Pengunjung</div><div class="m-value">{format_id_num(total_pengunjung_val)}</div><div class="m-sub">Orang</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-person-walking"></i></div><div class="m-title">Hari Ini</div><div class="m-value">{pengunjung_hari_ini_val}</div><div class="m-sub">Orang</div></div>
-                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-ticket"></i></div><div class="m-title">Tiket</div><div class="m-value">{tiket_val}</div><div class="m-sub">Juta Rp</div></div>
+                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-ticket"></i></div><div class="m-title">Tiket</div><div class="m-value" style="font-size: 9.5px;">{tiket_formatted_str}</div><div class="m-sub">Rupiah</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-star"></i></div><div class="m-title">Kepuasan</div><div class="m-value">{kepuasan_wisatawan}%</div><div class="m-sub">Sangat Baik</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-store"></i></div><div class="m-title">UMKM</div><div class="m-value">{umkm_aktif_val}</div><div class="m-sub">Unit</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-house"></i></div><div class="m-title">Homestay</div><div class="m-value">{homestay_val}</div><div class="m-sub">Unit</div></div>
