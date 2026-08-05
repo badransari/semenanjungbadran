@@ -28,7 +28,7 @@ def load_desa_data(url):
 
 df_desa = load_desa_data(SHEET_URL)
 
-# --- FUNGSI AMBIL DATA FLEKSIBEL & UNIVERSAL ---
+# --- FUNGSI AMBIL DATA & KONVERSI AMAN (ANTI-ERROR) ---
 def get_val_flex(df, key_candidates, default_val):
     if df is None or df.empty:
         return default_val
@@ -36,7 +36,6 @@ def get_val_flex(df, key_candidates, default_val):
         key_candidates = [key_candidates]
     norm_candidates = [str(k).strip().lower() for k in key_candidates]
     
-    # Cek format horizontal (kolom sebagai kunci)
     for col in df.columns:
         if str(col).strip().lower() in norm_candidates:
             try:
@@ -46,7 +45,6 @@ def get_val_flex(df, key_candidates, default_val):
             except:
                 pass
                 
-    # Cek format vertikal / Key-Value (Kolom 0 sebagai Kunci, Kolom 1 sebagai Nilai)
     if len(df.columns) >= 2:
         key_col = df.columns[0]
         val_col = df.columns[1]
@@ -80,6 +78,21 @@ def get_list_flex(df, key_candidates, default_list):
                 pass
     return default_list
 
+def safe_num(val, default=0.0):
+    if pd.isna(val):
+        return default
+    try:
+        s = str(val).strip()
+        if not s or s.lower() == 'nan':
+            return default
+        s = s.replace('.', '').replace(',', '.') if '.' in s and ',' in s else s.replace(',', '.')
+        return float(s)
+    except:
+        return default
+
+def safe_int(val, default=0):
+    return int(safe_num(val, float(default)))
+
 def clean_num_str(val_str):
     if pd.isna(val_str):
         return 1000
@@ -92,11 +105,11 @@ def clean_num_str(val_str):
 def format_id_num(val):
     return f"{int(val):,}".replace(",", ".")
 
-# Ekstraksi Data Dasar dari Spreadsheet (Mendukung Berbagai Variasi Nama Kolom)
+# Ekstraksi Data Dasar dari Spreadsheet
 base_total_pengunjung = clean_num_str(get_val_flex(df_desa, ['total_pengunjung', 'pengunjung', 'jumlah_pengunjung'], 4922))
-base_pendapatan_total = float(str(get_val_flex(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7)).replace(',', '.'))
+base_pendapatan_total = safe_num(get_val_flex(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
 base_pengunjung_hari_ini = clean_num_str(get_val_flex(df_desa, ['pengunjung_hari_ini', 'pengunjung_harian', 'hari_ini'], 176))
-base_tiket_val = float(str(get_val_flex(df_desa, ['tiket_val', 'tiket', 'pendapatan_tiket'], 78.4)).replace(',', '.'))
+base_tiket_val = safe_num(get_val_flex(df_desa, ['tiket_val', 'tiket', 'pendapatan_tiket'], 78.4), 78.4)
 
 pokdarwis_val = clean_num_str(get_val_flex(df_desa, ['pokdarwis', 'pokdarwis_val', 'jumlah_pokdarwis'], 3))
 pengelola_val = clean_num_str(get_val_flex(df_desa, ['pengelola', 'pengelola_val', 'jumlah_pengelola'], 27))
@@ -177,15 +190,15 @@ tiktok_val = format_id_num(base_tiktok * multiplier)
 fb_reach_val = format_id_num(base_fb * multiplier)
 website_val = format_id_num(base_web * multiplier)
 
-# Skala Data Grafik berdasarkan Filter
+# Skala Data Grafik Berbasis Safe Parsing
 base_trend = get_list_flex(df_desa, ['trend_pengunjung', 'trend'], [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
-trend_data = [max(10, int(float(str(val).replace(',', '.')) * multiplier)) for val in base_trend]
+trend_data = [max(10, int(safe_num(val, 100) * multiplier)) for val in base_trend]
 
 base_facility = get_list_flex(df_desa, ['fasilitas_unit', 'fasilitas'], [2, 4, 2, 6, 8, 12])
-facility_data = [max(1, int(float(str(val).replace(',', '.')) * (multiplier ** 0.5))) for val in base_facility]
+facility_data = [max(1, int(safe_num(val, 2) * (multiplier ** 0.5))) for val in base_facility]
 
 base_revenue = get_list_flex(df_desa, ['pendapatan_kategori', 'pendapatan_kategori'], [68, 22, 18, 15, 28])
-revenue_data = [round(float(str(val).replace(',', '.')) * multiplier, 1) for val in base_revenue]
+revenue_data = [round(safe_num(val, 10.0) * multiplier, 1) for val in base_revenue]
 
 base_expense = [35, 28, 18, 16, 15]
 expense_data = [round(val * multiplier, 1) for val in base_expense]
@@ -195,7 +208,8 @@ if filter_jenis_wisatawan == "Lampung":
 elif filter_jenis_wisatawan == "Luar Lampung":
     origin_data = [12, 36, 26, 16, 10]
 else:
-    origin_data = [int(float(str(x).replace(',', '.'))) for x in get_list_flex(df_desa, ['asal_wisatawan_pct', 'asal_wisatawan'], [55, 17, 10, 7, 6])]
+    base_origin = get_list_flex(df_desa, ['asal_wisatawan_pct', 'asal_wisatawan'], [55, 17, 10, 7, 6])
+    origin_data = [safe_int(x, 10) for x in base_origin]
 
 base_promo = [35, 25, 15, 15, 10]
 promo_data = [max(5, int(val * (multiplier ** 0.3))) for val in base_promo]
