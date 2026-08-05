@@ -16,7 +16,7 @@ st.set_page_config(
 # --- KONEKSI SUMBER DATA (GOOGLE SHEETS CSV ANDA) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv"
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=5) # Cache singkat agar update spreadsheet langsung terasa
 def load_desa_data(url):
     if not url:
         return None
@@ -28,24 +28,56 @@ def load_desa_data(url):
 
 df_desa = load_desa_data(SHEET_URL)
 
-# --- FUNGSI AMBIL DATA DINAMIS DARI SPREADSHEET ---
-def get_val(df, col_name, default_val):
-    if df is not None and not df.empty and col_name in df.columns:
-        try:
-            val = df[col_name].dropna().iloc[0]
-            return val
-        except Exception:
-            return default_val
+# --- FUNGSI AMBIL DATA FLEKSIBEL & UNIVERSAL ---
+def get_val_flex(df, key_candidates, default_val):
+    if df is None or df.empty:
+        return default_val
+    if isinstance(key_candidates, str):
+        key_candidates = [key_candidates]
+    norm_candidates = [str(k).strip().lower() for k in key_candidates]
+    
+    # Cek format horizontal (kolom sebagai kunci)
+    for col in df.columns:
+        if str(col).strip().lower() in norm_candidates:
+            try:
+                val = df[col].dropna().iloc[0]
+                if not pd.isna(val):
+                    return val
+            except:
+                pass
+                
+    # Cek format vertikal / Key-Value (Kolom 0 sebagai Kunci, Kolom 1 sebagai Nilai)
+    if len(df.columns) >= 2:
+        key_col = df.columns[0]
+        val_col = df.columns[1]
+        for idx, row in df.iterrows():
+            row_key = str(row[key_col]).strip().lower()
+            if row_key in norm_candidates:
+                try:
+                    val = row[val_col]
+                    if not pd.isna(val):
+                        return val
+                except:
+                    pass
     return default_val
 
-def get_list_col(df, col_name, default_list):
-    if df is not None and not df.empty and col_name in df.columns:
-        try:
-            vals = df[col_name].dropna().tolist()
-            if len(vals) > 0:
-                return vals
-        except Exception:
-            return default_list
+def get_list_flex(df, key_candidates, default_list):
+    if df is None or df.empty:
+        return default_list
+    if isinstance(key_candidates, str):
+        key_candidates = [key_candidates]
+    norm_candidates = [str(k).strip().lower() for k in key_candidates]
+    
+    for col in df.columns:
+        if str(col).strip().lower() in norm_candidates:
+            try:
+                vals = df[col].dropna().tolist()
+                if len(vals) > 0:
+                    if len(vals) == 1 and isinstance(vals[0], str) and ',' in vals[0]:
+                        return [v.strip() for v in vals[0].split(',')]
+                    return vals
+            except:
+                pass
     return default_list
 
 def clean_num_str(val_str):
@@ -53,32 +85,33 @@ def clean_num_str(val_str):
         return 1000
     cleaned = str(val_str).replace(".", "").replace(",", "").replace(" ", "")
     try:
-        return int(cleaned)
+        return int(float(cleaned))
     except:
         return 1000
 
 def format_id_num(val):
     return f"{int(val):,}".replace(",", ".")
 
-# Ekstraksi Data Dasar dari Spreadsheet
-base_total_pengunjung = int(get_val(df_desa, 'total_pengunjung', 4922))
-base_pendapatan_total = float(get_val(df_desa, 'pendapatan_total', 152.7))
-base_pengunjung_hari_ini = int(get_val(df_desa, 'pengunjung_hari_ini', 176))
-base_tiket_val = float(get_val(df_desa, 'tiket_val', 78.4))
-pokdarwis_val = int(get_val(df_desa, 'pokdarwis_val', 3))
-pengelola_val = int(get_val(df_desa, 'pengelola_val', 27))
-base_umkm_val = int(get_val(df_desa, 'umkm_aktif_val', 42))
-event_val = int(get_val(df_desa, 'event_val', 8))
-mitra_val = int(get_val(df_desa, 'mitra_val', 12))
-relawan_val = int(get_val(df_desa, 'relawan_val', 36))
+# Ekstraksi Data Dasar dari Spreadsheet (Mendukung Berbagai Variasi Nama Kolom)
+base_total_pengunjung = clean_num_str(get_val_flex(df_desa, ['total_pengunjung', 'pengunjung', 'jumlah_pengunjung'], 4922))
+base_pendapatan_total = float(str(get_val_flex(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7)).replace(',', '.'))
+base_pengunjung_hari_ini = clean_num_str(get_val_flex(df_desa, ['pengunjung_hari_ini', 'pengunjung_harian', 'hari_ini'], 176))
+base_tiket_val = float(str(get_val_flex(df_desa, ['tiket_val', 'tiket', 'pendapatan_tiket'], 78.4)).replace(',', '.'))
 
-base_ig = clean_num_str(get_val(df_desa, 'ig_followers', '3842'))
-base_tiktok = clean_num_str(get_val(df_desa, 'tiktok', '2156'))
-base_fb = clean_num_str(get_val(df_desa, 'fb_reach', '8745'))
-base_web = clean_num_str(get_val(df_desa, 'website', '5231'))
+pokdarwis_val = clean_num_str(get_val_flex(df_desa, ['pokdarwis', 'pokdarwis_val', 'jumlah_pokdarwis'], 3))
+pengelola_val = clean_num_str(get_val_flex(df_desa, ['pengelola', 'pengelola_val', 'jumlah_pengelola'], 27))
+base_umkm_val = clean_num_str(get_val_flex(df_desa, ['umkm_aktif_val', 'umkm', 'umkm_aktif', 'jumlah_umkm'], 42))
+event_val = clean_num_str(get_val_flex(df_desa, ['event_val', 'event', 'jumlah_event'], 8))
+mitra_val = clean_num_str(get_val_flex(df_desa, ['mitra_val', 'mitra', 'jumlah_mitra'], 12))
+relawan_val = clean_num_str(get_val_flex(df_desa, ['relawan_val', 'relawan', 'jumlah_relawan'], 36))
 
-lampung_base = int(get_val(df_desa, 'propinsi_lampung_pct', 75))
-luar_base = int(get_val(df_desa, 'propinsi_luar_pct', 25))
+base_ig = clean_num_str(get_val_flex(df_desa, ['ig_followers', 'instagram', 'ig', 'followers_ig'], '3842'))
+base_tiktok = clean_num_str(get_val_flex(df_desa, ['tiktok', 'tiktok_followers', 'pengikut_tiktok'], '2156'))
+base_fb = clean_num_str(get_val_flex(df_desa, ['fb_reach', 'facebook', 'fb', 'jangkauan_fb'], '8745'))
+base_web = clean_num_str(get_val_flex(df_desa, ['website', 'web', 'kunjungan_website'], '5231'))
+
+lampung_base = clean_num_str(get_val_flex(df_desa, ['propinsi_lampung_pct', 'lampung_pct', 'lampung'], 75))
+luar_base = clean_num_str(get_val_flex(df_desa, ['propinsi_luar_pct', 'luar_pct', 'luar_lampung'], 25))
 
 # 2. Sidebar Filter Data & Gambar Kiri Atas
 st.sidebar.markdown("""
@@ -145,14 +178,14 @@ fb_reach_val = format_id_num(base_fb * multiplier)
 website_val = format_id_num(base_web * multiplier)
 
 # Skala Data Grafik berdasarkan Filter
-base_trend = get_list_col(df_desa, 'trend_pengunjung', [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
-trend_data = [max(10, int(val * multiplier)) for val in base_trend]
+base_trend = get_list_flex(df_desa, ['trend_pengunjung', 'trend'], [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
+trend_data = [max(10, int(float(str(val).replace(',', '.')) * multiplier)) for val in base_trend]
 
-base_facility = get_list_col(df_desa, 'fasilitas_unit', [2, 4, 2, 6, 8, 12])
-facility_data = [max(1, int(val * (multiplier ** 0.5))) for val in base_facility]
+base_facility = get_list_flex(df_desa, ['fasilitas_unit', 'fasilitas'], [2, 4, 2, 6, 8, 12])
+facility_data = [max(1, int(float(str(val).replace(',', '.')) * (multiplier ** 0.5))) for val in base_facility]
 
-base_revenue = get_list_col(df_desa, 'pendapatan_kategori', [68, 22, 18, 15, 28])
-revenue_data = [round(val * multiplier, 1) for val in base_revenue]
+base_revenue = get_list_flex(df_desa, ['pendapatan_kategori', 'pendapatan_kategori'], [68, 22, 18, 15, 28])
+revenue_data = [round(float(str(val).replace(',', '.')) * multiplier, 1) for val in base_revenue]
 
 base_expense = [35, 28, 18, 16, 15]
 expense_data = [round(val * multiplier, 1) for val in base_expense]
@@ -162,9 +195,9 @@ if filter_jenis_wisatawan == "Lampung":
 elif filter_jenis_wisatawan == "Luar Lampung":
     origin_data = [12, 36, 26, 16, 10]
 else:
-    origin_data = get_list_col(df_desa, 'asal_wisatawan_pct', [55, 17, 10, 7, 6])
+    origin_data = [int(float(str(x).replace(',', '.'))) for x in get_list_flex(df_desa, ['asal_wisatawan_pct', 'asal_wisatawan'], [55, 17, 10, 7, 6])]
 
-base_promo = get_list_col(df_desa, 'promo_kontribusi', [35, 25, 15, 15, 10])
+base_promo = [35, 25, 15, 15, 10]
 promo_data = [max(5, int(val * (multiplier ** 0.3))) for val in base_promo]
 
 base_likes = [1200, 1500, 2100, 2800, 3200, 3900]
@@ -174,8 +207,8 @@ eng_likes = [max(50, int(v * multiplier)) for v in base_likes]
 eng_comments = [max(10, int(v * multiplier)) for v in base_comments]
 eng_shares = [max(5, int(v * multiplier)) for v in base_shares]
 
-event_dates = get_list_col(df_desa, 'event_tanggal', ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"])
-event_names = get_list_col(df_desa, 'event_nama', ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"])
+event_dates = get_list_flex(df_desa, ['event_tanggal', 'tanggal_event'], ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"])
+event_names = get_list_flex(df_desa, ['event_nama', 'nama_event'], ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"])
 current_events = list(zip(event_dates, event_names))
 event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
 
