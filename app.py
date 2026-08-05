@@ -41,7 +41,6 @@ def get_col_val(df, col_keywords, default_val):
         col_clean = str(col).strip().lower()
         if any(kw.lower() in col_clean for kw in col_keywords):
             try:
-                # Ambil baris pertama data di bawah header
                 val = df[col].dropna().iloc[0]
                 if not pd.isna(val) and str(val).strip().lower() not in ['jumlah', 'indikator', 'value', '']:
                     return val
@@ -56,7 +55,6 @@ def safe_num(val, default=0.0):
         s = str(val).strip()
         if not s or s.lower() == 'nan':
             return default
-        # Bersihkan format pemisah ribuan/desimal agar aman dibaca float
         s = s.replace('Rp', '').replace('%', '').replace('Orang', '').strip()
         if '.' in s and ',' in s:
             s = s.replace('.', '').replace(',', '.')
@@ -72,13 +70,19 @@ def safe_int(val, default=0):
 def format_id_num(val):
     return f"{int(val):,}".replace(",", ".")
 
+def format_rupiah(val):
+    if val < 10000:
+        full_val = int(val * 1_000_000)
+    else:
+        full_val = int(val)
+    return f"Rp {full_val:,}".replace(",", ".")
+
 # --- EKSTRAKSI DATA DARI SPREADSHEET DENGAN DEFAULT YANG STABIL ---
 base_total_pengunjung = safe_int(get_col_val(df_desa, ['total_pengunjung', 'pengunjung', 'jumlah_pengunjung'], 4922), 4922)
 base_pendapatan_total = safe_num(get_col_val(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
 base_pengunjung_hari_ini = safe_int(get_col_val(df_desa, ['pengunjung_hari_ini', 'hari_ini'], 176), 176)
 base_tiket_val = safe_num(get_col_val(df_desa, ['tiket_val', 'tiket'], 78.4), 78.4)
 
-# Data Manajemen sesuai spreadsheet Anda (Pokdarwis, Pengelola, UMKM Aktif, dll)
 pokdarwis_val = safe_int(get_col_val(df_desa, ['pokdarwis'], 9), 9)
 pengelola_val = safe_int(get_col_val(df_desa, ['pengelola'], 27), 27)
 base_umkm_val = safe_int(get_col_val(df_desa, ['umkm aktif', 'umkm'], 42), 42)
@@ -116,7 +120,6 @@ filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar",
 filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
 filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
 
-# --- TOMBOL REFRESH DI BAGIAN BAWAH FILTER (BENTUK SHAPE/IKON MINIMALIS) ---
 st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.2);'>", unsafe_allow_html=True)
 st.sidebar.markdown("""
     <div style="text-align: center; margin-bottom: 6px;">
@@ -160,6 +163,8 @@ else:
 
 total_pengunjung_val = int(base_total_pengunjung * multiplier)
 pendapatan_total_val = round(base_pendapatan_total * multiplier, 1)
+pendapatan_formatted_str = format_rupiah(pendapatan_total_val)
+
 pengunjung_hari_ini_val = int(base_pengunjung_hari_ini * multiplier)
 tiket_val = round(base_tiket_val * multiplier, 1)
 umkm_aktif_val = int(base_umkm_val * (0.9 if multiplier < 1 else 1))
@@ -284,12 +289,12 @@ dashboard_html = f"""
         </div>
         <div class="stats-group">
             <div class="stat-item">
-                <span>👥 Pengunjung</span>
+                <span>👥 Total Pengunjung</span>
                 <strong>{total_pengunjung_val:,} Orang</strong>
             </div>
             <div class="stat-item">
                 <span>💰 Pendapatan</span>
-                <strong>Rp {pendapatan_total_val} Juta</strong>
+                <strong>{pendapatan_formatted_str}</strong>
             </div>
             <div class="stat-item">
                 <span>⭐ Kepuasan</span>
@@ -304,7 +309,7 @@ dashboard_html = f"""
             <div class="card-box">
                 <div class="col-header bg-green"><i class="fa-solid fa-umbrella-beach"></i> 1. Layanan Pariwisata</div>
                 <div class="metric-subgrid">
-                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-users"></i></div><div class="m-title">Pengunjung</div><div class="m-value">{total_pengunjung_val:,}</div><div class="m-sub">Orang</div></div>
+                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-users"></i></div><div class="m-title">Total Pengunjung</div><div class="m-value">{format_id_num(total_pengunjung_val)}</div><div class="m-sub">Orang</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-person-walking"></i></div><div class="m-title">Hari Ini</div><div class="m-value">{pengunjung_hari_ini_val}</div><div class="m-sub">Orang</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-ticket"></i></div><div class="m-title">Tiket</div><div class="m-value">{tiket_val}</div><div class="m-sub">Juta Rp</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-star"></i></div><div class="m-title">Kepuasan</div><div class="m-value">{kepuasan_wisatawan}%</div><div class="m-sub">Sangat Baik</div></div>
