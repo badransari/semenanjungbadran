@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import random
+import time         # <--- TAMBAHKAN INI UNTUK FITUR REFRESH
 import warnings
 import streamlit.components.v1 as components
 
@@ -8,7 +9,7 @@ warnings.filterwarnings('ignore')
 
 # 1. Konfigurasi Halaman (Wide Layout & Clean Padding)
 st.set_page_config(
-    page_title="Smart Tourism Dashboard Desa Badransari", 
+    page_title="Dashboard Desa Badransari", 
     page_icon="🌿", 
     layout="wide", 
     initial_sidebar_state="expanded"
@@ -18,15 +19,26 @@ st.set_page_config(
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv"
 SHEET_MANAJEMEN_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv&gid=191716433"
 
-@st.cache_data(ttl=0) 
+@st.cache_data(ttl=60) 
 def load_desa_data(url):
     if not url:
         return None
     try:
-        df = pd.read_csv(url)
+        # TRICK ANTI-CACHE: Tambahkan parameter waktu ke URL
+        # Ini memaksa Google Sheets memberikan data paling baru, bukan data lama.
+        cache_buster = f"&t={int(time.time())}"
+        fresh_url = url + cache_buster
+        
+        df = pd.read_csv(fresh_url)
         return df
     except Exception as e:
         return None
+
+df_desa = load_desa_data(SHEET_URL)
+df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
+
+if df_manajemen is None or df_manajemen.empty:
+    df_manajemen = df_desa
 
 df_desa = load_desa_data(SHEET_URL)
 df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
