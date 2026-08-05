@@ -28,7 +28,7 @@ def load_desa_data(url):
 
 df_desa = load_desa_data(SHEET_URL)
 
-# --- FUNGSI AMBIL DATA DINAMIS DARI SPREADSHEET (DENGAN FALLBACK AMAN) ---
+# --- FUNGSI AMBIL DATA DINAMIS DARI SPREADSHEET ---
 def get_val(df, col_name, default_val):
     if df is not None and not df.empty and col_name in df.columns:
         try:
@@ -48,10 +48,10 @@ def get_list_col(df, col_name, default_list):
             return default_list
     return default_list
 
-# Ekstraksi Data dari Spreadsheet Anda
-total_pengunjung_val = int(get_val(df_desa, 'total_pengunjung', 4922))
-pendapatan_total_val = float(get_val(df_desa, 'pendapatan_total', 152.7))
-pengunjung_hari_ini_val = int(get_val(df_desa, 'pengunjung_hari_ini', 176))
+# Ekstraksi Data Dasar dari Spreadsheet
+base_total_pengunjung = int(get_val(df_desa, 'total_pengunjung', 4922))
+base_pendapatan_total = float(get_val(df_desa, 'pendapatan_total', 152.7))
+base_pengunjung_hari_ini = int(get_val(df_desa, 'pengunjung_hari_ini', 176))
 tiket_val = float(get_val(df_desa, 'tiket_val', 78.4))
 pokdarwis_val = int(get_val(df_desa, 'pokdarwis_val', 3))
 pengelola_val = int(get_val(df_desa, 'pengelola_val', 27))
@@ -69,6 +69,43 @@ review_val = int(get_val(df_desa, 'review_val', 157))
 lampung_prop = int(get_val(df_desa, 'propinsi_lampung_pct', 75))
 luar_prop = int(get_val(df_desa, 'propinsi_luar_pct', 25))
 
+# 2. Sidebar Filter Data & Gambar Kiri Atas
+st.sidebar.markdown("""
+    <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
+            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
+                Desa Wisata Semenanjung Badran
+            </h3>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown('### <i class="fa-solid fa-filter"></i> FILTER DATA', unsafe_allow_html=True)
+filter_tahun = st.sidebar.selectbox("📅 Tahun", ["Semua", "2026", "2025", "2024"])
+filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])
+filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
+filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
+
+# --- PENERAPAN LOGIKA FILTER INTERAKTIF ---
+multiplier = 1.0
+if filter_tahun == "2025": multiplier = 0.85
+elif filter_tahun == "2024": multiplier = 0.70
+if filter_jenis_wisatawan == "Lampung": multiplier *= (lampung_prop / 100)
+elif filter_jenis_wisatawan == "Luar Lampung": multiplier *= (luar_prop / 100)
+
+total_pengunjung_val = int(base_total_pengunjung * multiplier)
+pendapatan_total_val = round(base_pendapatan_total * multiplier, 1)
+pengunjung_hari_ini_val = int(base_pengunjung_hari_ini * multiplier)
+
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+st.sidebar.markdown(f"""
+    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); text-align: center;">
+        <p style="font-size: 10px; font-weight: 700; color: #FFD700; margin:0; text-transform: uppercase;">Status Filter Aktif</p>
+        <p style="font-size: 10px; font-weight: 600; color: white; margin: 3px 0 0 0;">Tahun: {filter_tahun} | Wisatawan: {filter_jenis_wisatawan}</p>
+    </div>
+""", unsafe_allow_html=True)
+
 # Ambil data Grafik & Event
 trend_data = get_list_col(df_desa, 'trend_pengunjung', [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680])
 facility_data = get_list_col(df_desa, 'fasilitas_unit', [2, 4, 2, 6, 8, 12])
@@ -81,7 +118,7 @@ event_names = get_list_col(df_desa, 'event_nama', ["Festival Desa Badransari", "
 current_events = list(zip(event_dates, event_names))
 event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
 
-# 2. Styling CSS untuk Sidebar & Konsistensi Tampilan
+# 3. Styling CSS untuk Sidebar & Konsistensi Tampilan
 st.markdown("""
     <style>
     .block-container {
@@ -100,32 +137,6 @@ st.markdown("""
     [data-baseweb="popover"], [data-baseweb="menu"] { z-index: 999999 !important; }
     iframe { border: none; border-radius: 8px; width: 100% !important; }
     </style>
-""", unsafe_allow_html=True)
-
-# 3. Sidebar Filter Data & Gambar Kiri Atas
-st.sidebar.markdown("""
-    <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
-        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
-            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
-                Desa Wisata Semenanjung Badran
-            </h3>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
-st.sidebar.markdown('### <i class="fa-solid fa-filter"></i> FILTER DATA', unsafe_allow_html=True)
-filter_tahun = st.sidebar.selectbox("📅 Tahun", ["Semua", "2025", "2024", "2026"])
-filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])
-filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
-filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
-
-st.sidebar.markdown("<br>", unsafe_allow_html=True)
-st.sidebar.markdown("""
-    <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); text-align: center;">
-        <p style="font-size: 10px; font-weight: 700; color: #FFD700; margin:0; text-transform: uppercase;">Sumber Data</p>
-        <p style="font-size: 11px; font-weight: 800; color: white; margin: 3px 0 0 0;">Google Spreadsheet Terhubung</p>
-    </div>
 """, unsafe_allow_html=True)
 
 dashboard_html = f"""
@@ -201,12 +212,12 @@ dashboard_html = f"""
         <div class="logo-area">
             <div class="title-area">
                 <h1>Smart Tourism Dashboard — Desa Badransari</h1>
-                <p>Kecamatan Punggur, Kabupaten Lampung Tengah</p>
+                <p>Kecamatan Punggur, Kabupaten Lampung Tengah (Filter: {filter_tahun} / {filter_jenis_wisatawan})</p>
             </div>
         </div>
         <div class="stats-group">
             <div class="stat-item">
-                <span>👥 Total Pengunjung</span>
+                <span>👥 Pengunjung</span>
                 <strong>{total_pengunjung_val:,} Orang</strong>
             </div>
             <div class="stat-item">
@@ -221,7 +232,7 @@ dashboard_html = f"""
     </div>
     
     <div class="three-column-grid">
-        <!-- KOLOM 1 -->
+        <!-- KOLOM 1: LAYANAN PARIWISATA -->
         <div class="column-box">
             <div class="card-box">
                 <div class="col-header bg-green"><i class="fa-solid fa-umbrella-beach"></i> 1. Layanan Pariwisata</div>
@@ -278,7 +289,7 @@ dashboard_html = f"""
             </div>
         </div>
 
-        <!-- KOLOM 2 -->
+        <!-- KOLOM 2: MANAJEMEN PARIWISATA -->
         <div class="column-box">
             <div class="card-box">
                 <div class="col-header bg-blue"><i class="fa-solid fa-gear"></i> 2. Manajemen Pariwisata</div>
@@ -329,17 +340,17 @@ dashboard_html = f"""
             </div>
         </div>
 
-        <!-- KOLOM 3 -->
+        <!-- KOLOM 3: PEMASARAN PARIWISATA (LENGKAP DENGAN KEPUASAN & PROMOSI) -->
         <div class="column-box">
             <div class="card-box">
-                <div class="col-header bg-purple"><i class="fa-solid fa-bullhorn"></i> 3. Pemasaran Pariwisata</div>
+                <div class="col-header bg-purple"><i class="fa-solid fa-bullhorn"></i> 3. Pemasaran & Promosi</div>
                 <div class="metric-subgrid">
                     <div class="m-card"><div class="m-icon" style="color: #E1306C; background: #FCE4EC;"><i class="fa-brands fa-instagram"></i></div><div class="m-title">IG Followers</div><div class="m-value">{ig_followers_val}</div><div class="m-sub">Akun</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #000; background: #F5F5F5;"><i class="fa-brands fa-tiktok"></i></div><div class="m-title">TikTok</div><div class="m-value">{tiktok_val}</div><div class="m-sub">Akun</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #1565C0; background: #E3F2FD;"><i class="fa-brands fa-facebook"></i></div><div class="m-title">FB Reach</div><div class="m-value">{fb_reach_val}</div><div class="m-sub">Jangkauan</div></div>
                     <div class="m-card"><div class="m-icon" style="color: #4A148C; background: #EDE7F6;"><i class="fa-solid fa-globe"></i></div><div class="m-title">Website</div><div class="m-value">{website_val}</div><div class="m-sub">Kunjungan</div></div>
-                    <div class="m-card"><div class="m-icon" style="color: #4A148C; background: #EDE7F6;"><i class="fa-solid fa-comments"></i></div><div class="m-title">Review</div><div class="m-value">{review_val}</div><div class="m-sub">Ulasan</div></div>
-                    <div class="m-card"><div class="m-icon" style="color: #F57F17; background: #FFF8E1;"><i class="fa-solid fa-star"></i></div><div class="m-title">Rating</div><div class="m-value">4,6</div><div class="m-sub">Sangat Baik</div></div>
+                    <div class="m-card"><div class="m-icon" style="color: #2E7D32; background: #E8F5E9;"><i class="fa-solid fa-face-smile"></i></div><div class="m-title">Kepuasan</div><div class="m-value">88%</div><div class="m-sub">Sangat Baik</div></div>
+                    <div class="m-card"><div class="m-icon" style="color: #F57F17; background: #FFF8E1;"><i class="fa-solid fa-bullhorn"></i></div><div class="m-title">Promo Efektif</div><div class="m-value">92%</div><div class="m-sub">Target Jangkau</div></div>
                 </div>
             </div>
             <div class="card-box">
@@ -347,7 +358,7 @@ dashboard_html = f"""
                 <canvas id="originChart" height="115"></canvas>
             </div>
             <div class="card-box">
-                <div class="section-title"><i class="fa-solid fa-share-nodes" style="color: #4A148C;"></i> Media Promosi (Kontribusi)</div>
+                <div class="section-title"><i class="fa-solid fa-share-nodes" style="color: #4A148C;"></i> Media Promosi (Kontribusi %)</div>
                 <canvas id="promoChart" height="115"></canvas>
             </div>
             <div class="card-box">
