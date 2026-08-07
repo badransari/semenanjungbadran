@@ -97,13 +97,11 @@ def format_rupiah(val):
   return f'Rp {val_int:,}'.replace(',', '.')
 
 
-# --- SIDEBAR: LOGO DI PALING ATAS & BANNER DESA ---
+# --- SIDEBAR: LOGO SEBESAR BANNER GAMBAR ---
 st.sidebar.markdown(
     """
-    <div style="text-align: center; margin-bottom: 12px; padding-top: 5px;">
-        <div style="background: #FFFFFF; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.4); display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.25);">
-            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 42px; width: auto; object-fit: contain; display: block;">
-        </div>
+    <div style="background: #FFFFFF; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; width: 100%; height: 100px;">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="max-height: 75px; max-width: 90%; object-fit: contain; display: block;">
     </div>
 
     <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
