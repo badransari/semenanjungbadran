@@ -1,200 +1,323 @@
-import streamlit as st
-import pandas as pd
 import random
-import time         # <--- TAMBAHKAN INI UNTUK FITUR REFRESH
+import time  # <--- TAMBAHKAN INI UNTUK FITUR REFRESH
 import warnings
+import pandas as pd
+import streamlit as st
 import streamlit.components.v1 as components
 
 warnings.filterwarnings('ignore')
 
 # 1. Konfigurasi Halaman (Wide Layout & Clean Padding)
 st.set_page_config(
-    page_title="Dashboard Desa Badransari", 
-    page_icon="🌿", 
-    layout="wide", 
-    initial_sidebar_state="expanded"
+    page_title='Dashboard Desa Badransari',
+    page_icon='🌿',
+    layout='wide',
+    initial_sidebar_state='expanded',
 )
 
 # --- KONEKSI SUMBER DATA (GOOGLE SHEETS CSV ANDA) ---
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv"
-SHEET_MANAJEMEN_URL = "https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv&gid=191716433"
+SHEET_URL = 'https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv'
+SHEET_MANAJEMEN_URL = 'https://docs.google.com/spreadsheets/d/1urU4z8LupF_t4rxP-lJrKIbqdvc4X1kb7_8dGknWhFE/export?format=csv&gid=191716433'
 
-@st.cache_data(ttl=60) 
+
+@st.cache_data(ttl=60)
 def load_desa_data(url):
-    if not url:
-        return None
-    try:
-        # TRICK ANTI-CACHE: Tambahkan parameter waktu ke URL
-        # Ini memaksa Google Sheets memberikan data paling baru, bukan data lama.
-        cache_buster = f"&t={int(time.time())}"
-        fresh_url = url + cache_buster
-        
-        df = pd.read_csv(fresh_url)
-        return df
-    except Exception as e:
-        return None
+  if not url:
+    return None
+  try:
+    # TRICK ANTI-CACHE: Tambahkan parameter waktu ke URL
+    # Ini memaksa Google Sheets memberikan data paling baru, bukan data lama.
+    cache_buster = f'&t={int(time.time())}'
+    fresh_url = url + cache_buster
+
+    df = pd.read_csv(fresh_url)
+    return df
+  except Exception as e:
+    return None
+
 
 df_desa = load_desa_data(SHEET_URL)
 df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
 
 if df_manajemen is None or df_manajemen.empty:
-    df_manajemen = df_desa
+  df_manajemen = df_desa
 
 df_desa = load_desa_data(SHEET_URL)
 df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
 
 # Jika df_manajemen gagal dimuat, fallback pakai df_desa agar tidak error
 if df_manajemen is None or df_manajemen.empty:
-    df_manajemen = df_desa
+  df_manajemen = df_desa
+
 
 # --- FUNGSI AMBIL DATA YANG AKURAT & AMAN DARI SPREADSHEET ---
 def get_col_val(df, col_keywords, default_val):
-    if df is None or df.empty:
-        return default_val
-    if isinstance(col_keywords, str):
-        col_keywords = [col_keywords]
-    
-    for col in df.columns:
-        col_clean = str(col).strip().lower()
-        if any(kw.lower() in col_clean for kw in col_keywords):
-            try:
-                val = df[col].dropna().iloc[0]
-                if not pd.isna(val) and str(val).strip().lower() not in ['jumlah', 'indikator', 'value', '']:
-                    return val
-            except:
-                pass
+  if df is None or df.empty:
     return default_val
+  if isinstance(col_keywords, str):
+    col_keywords = [col_keywords]
+
+  for col in df.columns:
+    col_clean = str(col).strip().lower()
+    if any(kw.lower() in col_clean for kw in col_keywords):
+      try:
+        val = df[col].dropna().iloc[0]
+        if not pd.isna(val) and str(val).strip().lower() not in [
+            'jumlah',
+            'indikator',
+            'value',
+            '',
+        ]:
+          return val
+      except:
+        pass
+  return default_val
+
 
 def safe_num(val, default=0.0):
-    if pd.isna(val):
-        return default
-    try:
-        s = str(val).strip()
-        if not s or s.lower() == 'nan':
-            return default
-        s = s.replace('Rp', '').replace('%', '').replace('Orang', '').strip()
-        if '.' in s and ',' in s:
-            s = s.replace('.', '').replace(',', '.')
-        else:
-            s = s.replace(',', '.')
-        return float(s)
-    except:
-        return default
+  if pd.isna(val):
+    return default
+  try:
+    s = str(val).strip()
+    if not s or s.lower() == 'nan':
+      return default
+    s = s.replace('Rp', '').replace('%', '').replace('Orang', '').strip()
+    if '.' in s and ',' in s:
+      s = s.replace('.', '').replace(',', '.')
+    else:
+      s = s.replace(',', '.')
+    return float(s)
+  except:
+    return default
+
 
 def safe_int(val, default=0):
-    return int(safe_num(val, float(default)))
+  return int(safe_num(val, float(default)))
+
 
 def format_id_num(val):
-    return f"{int(val):,}".replace(",", ".")
+  return f'{int(val):,}'.replace(',', '.')
+
 
 def format_rupiah(val):
-    try:
-        val_int = int(val)
-    except:
-        val_int = 0
-    return f"Rp {val_int:,}".replace(",", ".")
+  try:
+    val_int = int(val)
+  except:
+    val_int = 0
+  return f'Rp {val_int:,}'.replace(',', '.')
+
 
 # --- SIDEBAR: GAMBAR & JUDUL DI ATAS ---
-st.sidebar.markdown("""
+st.sidebar.markdown(
+    """
     <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
-        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.2), rgba(15,50,85,0.9)); display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;">
-            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase;">
+        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 135px; object-fit: cover; display: block;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.25), rgba(15,50,85,0.92)); display: flex; flex-direction: column; justify-content: space-between; padding: 10px;">
+            <div style="display: flex; align-items: center; justify-content: flex-start;">
+                <div style="background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(4px); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); display: inline-flex; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); opacity: 0.95;">
+                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 32px; width: auto; object-fit: contain; border-radius: 3px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));">
+                </div>
+            </div>
+            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase; text-shadow: 0px 2px 4px rgba(0,0,0,0.8);">
                 Desa Wisata Semenanjung Badran
             </h3>
         </div>
     </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-st.sidebar.markdown("<hr style='border-color: rgba(255,255,255,0.2); margin: 10px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown(
+    "<hr style='border-color: rgba(255,255,255,0.2); margin: 10px 0;'>",
+    unsafe_allow_html=True,
+)
 
 # Filter Data di Sidebar
-filter_tahun = st.sidebar.selectbox("📅 Tahun", ["Semua", "2026", "2025", "2024"])
-filter_bulan = st.sidebar.selectbox("🕒 Bulan", ["Semua", "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"])
-filter_jenis_wisatawan = st.sidebar.selectbox("👥 Jenis Wisatawan", ["Semua", "Lampung", "Luar Lampung"])
-filter_jenis = st.sidebar.selectbox("⛰️ Jenis Wisata", ["Semua", "Wisata Alam", "Wisata Edukasi", "Kuliner & Outbound"])
+filter_tahun = st.sidebar.selectbox('📅 Tahun', ['Semua', '2026', '2025', '2024'])
+filter_bulan = st.sidebar.selectbox(
+    '🕒 Bulan',
+    [
+        'Semua',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agu',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des',
+    ],
+)
+filter_jenis_wisatawan = st.sidebar.selectbox(
+    '👥 Jenis Wisatawan', ['Semua', 'Lampung', 'Luar Lampung']
+)
+filter_jenis = st.sidebar.selectbox(
+    '⛰️ Jenis Wisata',
+    ['Semua', 'Wisata Alam', 'Wisata Edukasi', 'Kuliner & Outbound'],
+)
 
-st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.2);'>", unsafe_allow_html=True)
-if st.sidebar.button("🔄 Perbarui Data", use_container_width=True):
-    st.cache_data.clear()
-    st.success("Data berhasil disinkronkan ulang!")
-    st.rerun()
+st.sidebar.markdown(
+    "<br><hr style='border-color: rgba(255,255,255,0.2);'>",
+    unsafe_allow_html=True,
+)
+
+if st.sidebar.button('🔄 Perbarui Data', use_container_width=True):
+  st.cache_data.clear()
+  st.success('Data berhasil disinkronkan ulang!')
+  st.rerun()
 
 # --- PENERAPAN LOGIKA FILTER & PENGHITUNGAN DINAMIS ---
 multiplier = 1.0
-if filter_tahun == "2025": 
-    multiplier *= 0.85
-elif filter_tahun == "2024": 
-    multiplier *= 0.70
+if filter_tahun == '2025':
+  multiplier *= 0.85
+elif filter_tahun == '2024':
+  multiplier *= 0.70
 
-if filter_jenis_wisatawan == "Lampung":
-    lampung_prop = 100
-    luar_prop = 0
-    multiplier *= 0.75
-elif filter_jenis_wisatawan == "Luar Lampung":
-    lampung_prop = 0
-    luar_prop = 100
-    multiplier *= 0.25
+if filter_jenis_wisatawan == 'Lampung':
+  lampung_prop = 100
+  luar_prop = 0
+  multiplier *= 0.75
+elif filter_jenis_wisatawan == 'Luar Lampung':
+  lampung_prop = 0
+  luar_prop = 100
+  multiplier *= 0.25
 else:
-    lampung_prop = 75
-    luar_prop = 25
+  lampung_prop = 75
+  luar_prop = 25
 
 # Hitung Tren Kunjungan Bulanan & Total Pengunjung
 base_monthly = [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680]
-months_list = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
-
-if filter_bulan != "Semua":
-    target_idx = months_list.index(filter_bulan) if filter_bulan in months_list else 0
-    trend_data = [int(v * multiplier) if i == target_idx else 0 for i, v in enumerate(base_monthly)]
+months_list = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+]
+if filter_bulan != 'Semua':
+  target_idx = (
+      months_list.index(filter_bulan) if filter_bulan in months_list else 0
+  )
+  trend_data = [
+      int(v * multiplier) if i == target_idx else 0
+      for i, v in enumerate(base_monthly)
+  ]
 else:
-    trend_data = [int(v * multiplier) for v in base_monthly]
+  trend_data = [int(v * multiplier) for v in base_monthly]
 
 total_pengunjung_val = sum(trend_data)
 if total_pengunjung_val == 0:
-    total_pengunjung_val = int(safe_int(get_col_val(df_desa, ['total_pengunjung', 'pengunjung'], 4922), 4922) * multiplier)
+  total_pengunjung_val = int(
+      safe_int(
+          get_col_val(df_desa, ['total_pengunjung', 'pengunjung'], 4922), 4922
+      )
+      * multiplier
+  )
 
 pengunjung_hari_ini_val = max(15, int(total_pengunjung_val / 45))
-base_pendapatan_total = safe_num(get_col_val(df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7), 152.7)
+
+base_pendapatan_total = safe_num(
+    get_col_val(
+        df_desa, ['pendapatan_total', 'total_pendapatan', 'pendapatan'], 152.7
+    ),
+    152.7,
+)
 pendapatan_total_val = int(base_pendapatan_total * 1_000_000 * multiplier)
 pendapatan_formatted_str = format_rupiah(pendapatan_total_val)
 
 # Pengambilan Tiket dari Sheet 'Data Manajemen' (Cell J3)
-base_tiket_num = safe_num(get_col_val(df_manajemen, ['harga tiket', 'tiket'], 10000), 10000)
+base_tiket_num = safe_num(
+    get_col_val(df_manajemen, ['harga tiket', 'tiket'], 10000), 10000
+)
 tiket_val_num = int(base_tiket_num)
 tiket_formatted_str = format_rupiah(tiket_val_num)
 
 # Manajemen Data dari Sheet 'Data Manajemen'
 pokdarwis_val = safe_int(get_col_val(df_manajemen, ['pokdarwis'], 9), 9)
 pengelola_val = safe_int(get_col_val(df_manajemen, ['pengelola'], 27), 27)
-umkm_aktif_val = safe_int(get_col_val(df_manajemen, ['mkm aktif', 'umkm aktif', 'umkm'], 42), 42)
-mitra_val = safe_int(get_col_val(df_manajemen, ['mitra kerja sama', 'mitra'], 12), 12)
+umkm_aktif_val = safe_int(
+    get_col_val(df_manajemen, ['mkm aktif', 'umkm aktif', 'umkm'], 42), 42
+)
+mitra_val = safe_int(
+    get_col_val(df_manajemen, ['mitra kerja sama', 'mitra'], 12), 12
+)
 relawan_val = safe_int(get_col_val(df_manajemen, ['relawan'], 36), 36)
-homestay_val = safe_int(get_col_val(df_manajemen, ['jumlah homestay', 'homestay'], 15), 15)
-event_val = safe_int(get_col_val(df_manajemen, ['event', 'jumlah_event'], 8), 8)
-keterlibatan_masyarakat = safe_int(get_col_val(df_manajemen, ['tingkat keterlibatan', 'keterlibatan'], 78), 78)
-kepuasan_wisatawan = safe_int(get_col_val(df_manajemen, ['tingkat kepuasan', 'kepuasan'], 88), 88)
+homestay_val = safe_int(
+    get_col_val(df_manajemen, ['jumlah homestay', 'homestay'], 15), 15
+)
+event_val = safe_int(
+    get_col_val(df_manajemen, ['event', 'jumlah_event'], 8), 8
+)
+keterlibatan_masyarakat = safe_int(
+    get_col_val(df_manajemen, ['tingkat keterlibatan', 'keterlibatan'], 78), 78
+)
+kepuasan_wisatawan = safe_int(
+    get_col_val(df_manajemen, ['tingkat kepuasan', 'kepuasan'], 88), 88
+)
 
-ig_followers_val = format_id_num(safe_int(get_col_val(df_desa, ['ig_followers', 'instagram', 'ig'], 3842), 3842) * multiplier)
-tiktok_val = format_id_num(safe_int(get_col_val(df_desa, ['tiktok'], 2156), 2156) * multiplier)
-fb_reach_val = format_id_num(safe_int(get_col_val(df_desa, ['fb_reach', 'facebook', 'fb'], 8745), 8745) * multiplier)
-website_val = format_id_num(safe_int(get_col_val(df_desa, ['website', 'web'], 5231), 5231) * multiplier)
+ig_followers_val = format_id_num(
+    safe_int(get_col_val(df_desa, ['ig_followers', 'instagram', 'ig'], 3842), 3842)
+    * multiplier
+)
+tiktok_val = format_id_num(
+    safe_int(get_col_val(df_desa, ['tiktok'], 2156), 2156) * multiplier
+)
+fb_reach_val = format_id_num(
+    safe_int(get_col_val(df_desa, ['fb_reach', 'facebook', 'fb'], 8745), 8745)
+    * multiplier
+)
+website_val = format_id_num(
+    safe_int(get_col_val(df_desa, ['website', 'web'], 5231), 5231) * multiplier
+)
 
 facility_data = [2, 4, 2, 6, 8, 12]
 revenue_data = [round(val * multiplier, 1) for val in [68, 22, 18, 15, 28]]
 expense_data = [round(val * multiplier, 1) for val in [35, 28, 18, 16, 15]]
 origin_data = [55, 17, 10, 7, 6]
 promo_data = [35, 25, 15, 15, 10]
-eng_likes = [max(50, int(v * multiplier)) for v in [1200, 1500, 2100, 2800, 3200, 3900]]
-eng_comments = [max(10, int(v * multiplier)) for v in [300, 450, 600, 800, 950, 1100]]
-eng_shares = [max(5, int(v * multiplier)) for v in [150, 220, 340, 450, 520, 680]]
 
-event_dates = ["14 Jan", "18 Feb", "24 Mar", "12 Mei", "20 Jul"]
-event_names = ["Festival Desa Badransari", "Pasar UMKM Kreatif", "Lomba Perahu Tradisional", "Camping & Outbound", "Festival Kuliner Desa"]
+eng_likes = [
+    max(50, int(v * multiplier)) for v in [1200, 1500, 2100, 2800, 3200, 3900]
+]
+eng_comments = [
+    max(10, int(v * multiplier)) for v in [300, 450, 600, 800, 950, 1100]
+]
+eng_shares = [
+    max(5, int(v * multiplier)) for v in [150, 220, 340, 450, 520, 680]
+]
+
+event_dates = ['14 Jan', '18 Feb', '24 Mar', '12 Mei', '20 Jul']
+event_names = [
+    'Festival Desa Badransari',
+    'Pasar UMKM Kreatif',
+    'Lomba Perahu Tradisional',
+    'Camping & Outbound',
+    'Festival Kuliner Desa',
+]
 current_events = list(zip(event_dates, event_names))
-event_html_items = "".join([f'<div class="event-item"><span class="event-date">{date}</span><span class="event-name">{name}</span></div>' for date, name in current_events])
+event_html_items = ''.join([
+    (
+        '<div class="event-item"><span'
+        f' class="event-date">{date}</span><span'
+        f' class="event-name">{name}</span></div>'
+    )
+    for date, name in current_events
+])
 
 # 3. Styling CSS
-st.markdown("""
+st.markdown(
+    """
     <style>
     .block-container {
         padding-top: 3.5rem !important;
@@ -212,7 +335,9 @@ st.markdown("""
     [data-baseweb="popover"], [data-baseweb="menu"] { z-index: 999999 !important; }
     iframe { border: none; border-radius: 8px; width: 100% !important; }
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 dashboard_html = f"""
 <!DOCTYPE html>
@@ -233,7 +358,8 @@ dashboard_html = f"""
             box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 100%;
         }}
         .logo-area {{ display: flex; align-items: center; gap: 14px; }}
-        .title-area h1 {{ font-size: 16px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; color: #FFD700; }}
+        .title-area h1 {{ font-size: 16px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; color: #FFD700; line-height: 1.2; }}
+        .title-area h2 {{ font-size: 13px; font-weight: 700; margin: 2px 0 0 0; text-transform: uppercase; letter-spacing: 0.5px; color: #FFFFFF; }}
         .title-area p {{ font-size: 10.5px; font-weight: 600; margin: 2px 0 0 0; color: #E0E0E0; }}
         .stats-group {{ display: flex; gap: 8px; }}
         .stat-item {{ background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.35); padding: 5px 10px; border-radius: 6px; text-align: center; }}
@@ -285,8 +411,12 @@ dashboard_html = f"""
 <body>
     <div class="top-banner">
         <div class="logo-area">
+            <div style="background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(4px); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); display: inline-flex; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); opacity: 0.95;">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 38px; width: auto; object-fit: contain; border-radius: 3px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));">
+            </div>
             <div class="title-area">
-                <h1>Smart Tourism Dashboard — Desa Badransari</h1>
+                <h1>SMART TOURISM DASHBOARD</h1>
+                <h2>DESA BADRANSARI</h2>
                 <p>Kecamatan Punggur, Kabupaten Lampung Tengah (Filter: {filter_tahun} | {filter_bulan} | {filter_jenis_wisatawan})</p>
             </div>
         </div>
@@ -473,7 +603,6 @@ dashboard_html = f"""
         function nextSlide() {{ showSlide(currentSlideIdx + 1); }}
         function prevSlide() {{ showSlide(currentSlideIdx - 1); }}
         setInterval(nextSlide, 3500);
-
         const trendValues = {trend_data};
         const facilityValues = {facility_data};
         const revenueValues = {revenue_data};
@@ -483,7 +612,6 @@ dashboard_html = f"""
         const engLikes = {eng_likes};
         const engComments = {eng_comments};
         const engShares = {eng_shares};
-
         new Chart(document.getElementById('trendChart').getContext('2d'), {{
             type: 'line',
             data: {{
@@ -564,5 +692,4 @@ dashboard_html = f"""
 </body>
 </html>
 """
-
 components.html(dashboard_html, height=1620, scrolling=True)
