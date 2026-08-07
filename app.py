@@ -1,5 +1,5 @@
 import random
-import time  # <--- TAMBAHKAN INI UNTUK FITUR REFRESH
+import time
 import warnings
 import pandas as pd
 import streamlit as st
@@ -25,11 +25,8 @@ def load_desa_data(url):
   if not url:
     return None
   try:
-    # TRICK ANTI-CACHE: Tambahkan parameter waktu ke URL
-    # Ini memaksa Google Sheets memberikan data paling baru, bukan data lama.
     cache_buster = f'&t={int(time.time())}'
     fresh_url = url + cache_buster
-
     df = pd.read_csv(fresh_url)
     return df
   except Exception as e:
@@ -39,13 +36,6 @@ def load_desa_data(url):
 df_desa = load_desa_data(SHEET_URL)
 df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
 
-if df_manajemen is None or df_manajemen.empty:
-  df_manajemen = df_desa
-
-df_desa = load_desa_data(SHEET_URL)
-df_manajemen = load_desa_data(SHEET_MANAJEMEN_URL)
-
-# Jika df_manajemen gagal dimuat, fallback pakai df_desa agar tidak error
 if df_manajemen is None or df_manajemen.empty:
   df_manajemen = df_desa
 
@@ -107,18 +97,19 @@ def format_rupiah(val):
   return f'Rp {val_int:,}'.replace(',', '.')
 
 
-# --- SIDEBAR: GAMBAR & JUDUL DI ATAS ---
+# --- SIDEBAR: LOGO DI PALING ATAS & BANNER DESA ---
 st.sidebar.markdown(
     """
+    <div style="text-align: center; margin-bottom: 12px; padding-top: 5px;">
+        <div style="background: #FFFFFF; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.4); display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.25);">
+            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 42px; width: auto; object-fit: contain; display: block;">
+        </div>
+    </div>
+
     <div style="position: relative; text-align: center; border-radius: 8px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
-        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 135px; object-fit: cover; display: block;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.25), rgba(15,50,85,0.92)); display: flex; flex-direction: column; justify-content: space-between; padding: 10px;">
-            <div style="display: flex; align-items: center; justify-content: flex-start;">
-                <div style="background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(4px); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); display: inline-flex; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); opacity: 0.95;">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 32px; width: auto; object-fit: contain; border-radius: 3px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));">
-                </div>
-            </div>
-            <h3 style="color: #FFD700 !important; font-size: 14px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase; text-shadow: 0px 2px 4px rgba(0,0,0,0.8);">
+        <img src="https://i.ytimg.com/vi/8PHHFvzMDac/maxresdefault.jpg" style="width: 100%; height: 130px; object-fit: cover; display: block;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(15,50,85,0.1), rgba(15,50,85,0.92)); display: flex; align-items: flex-end; justify-content: center; padding: 12px;">
+            <h3 style="color: #FFD700 !important; font-size: 13.5px !important; font-weight: 800 !important; margin: 0; text-transform: uppercase; text-shadow: 0px 2px 4px rgba(0,0,0,0.8); line-height: 1.3;">
                 Desa Wisata Semenanjung Badran
             </h3>
         </div>
@@ -189,7 +180,6 @@ else:
   lampung_prop = 75
   luar_prop = 25
 
-# Hitung Tren Kunjungan Bulanan & Total Pengunjung
 base_monthly = [240, 280, 310, 520, 610, 720, 480, 510, 420, 400, 440, 680]
 months_list = [
     'Jan',
@@ -236,14 +226,12 @@ base_pendapatan_total = safe_num(
 pendapatan_total_val = int(base_pendapatan_total * 1_000_000 * multiplier)
 pendapatan_formatted_str = format_rupiah(pendapatan_total_val)
 
-# Pengambilan Tiket dari Sheet 'Data Manajemen' (Cell J3)
 base_tiket_num = safe_num(
     get_col_val(df_manajemen, ['harga tiket', 'tiket'], 10000), 10000
 )
 tiket_val_num = int(base_tiket_num)
 tiket_formatted_str = format_rupiah(tiket_val_num)
 
-# Manajemen Data dari Sheet 'Data Manajemen'
 pokdarwis_val = safe_int(get_col_val(df_manajemen, ['pokdarwis'], 9), 9)
 pengelola_val = safe_int(get_col_val(df_manajemen, ['pengelola'], 27), 27)
 umkm_aktif_val = safe_int(
@@ -252,7 +240,9 @@ umkm_aktif_val = safe_int(
 mitra_val = safe_int(
     get_col_val(df_manajemen, ['mitra kerja sama', 'mitra'], 12), 12
 )
-relawan_val = safe_int(get_col_val(df_manajemen, ['relawan'], 36), 36)
+relawan_val = safe_int(
+    get_col_val(df_manajemen, ['relawan'], 36), 36
+)
 homestay_val = safe_int(
     get_col_val(df_manajemen, ['jumlah homestay', 'homestay'], 15), 15
 )
@@ -315,7 +305,7 @@ event_html_items = ''.join([
     for date, name in current_events
 ])
 
-# 3. Styling CSS
+# Styling CSS
 st.markdown(
     """
     <style>
@@ -411,8 +401,8 @@ dashboard_html = f"""
 <body>
     <div class="top-banner">
         <div class="logo-area">
-            <div style="background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(4px); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.3); display: inline-flex; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); opacity: 0.95;">
-                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 38px; width: auto; object-fit: contain; border-radius: 3px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));">
+            <div style="background: rgba(255, 255, 255, 0.95); padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQw8btagLJ3nP18pBdJHEJgPhf2Bi16EmR7Mj09LeZRiQ&s" style="height: 38px; width: auto; object-fit: contain; border-radius: 3px;">
             </div>
             <div class="title-area">
                 <h1>SMART TOURISM DASHBOARD</h1>
